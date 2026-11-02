@@ -1,5 +1,5 @@
 # Local development image — not intended for production (deploys go via `pnpm deploy`).
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 
 # pnpm via corepack, pinned to the same major as the host tooling.
 RUN corepack enable && corepack prepare pnpm@11 --activate
