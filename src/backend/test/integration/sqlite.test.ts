@@ -35,6 +35,8 @@ const migrationStatements = readdirSync(migrationDir)
 const EXPECTED_TABLES = [
   "account",
   "apikey",
+  "audience_contacts",
+  "audience_lists",
   "email_attachments",
   "email_contents",
   "email_histories",

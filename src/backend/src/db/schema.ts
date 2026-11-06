@@ -374,10 +374,53 @@ export const updateCheck = sqliteTable("update_check", {
   error: text("error"),
 });
 
+// Audience lists: reusable recipient groups owned by a user (dashboard-managed).
+export const audienceLists = sqliteTable(
+  "audience_lists",
+  {
+    id: text("id").primaryKey().$defaultFn(() => createId()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("audienceLists_userId_idx").on(table.userId)],
+);
+
+// Contacts scoped to an audience list. `variables` holds extra CSV columns as JSON for template personalization.
+export const audienceContacts = sqliteTable(
+  "audience_contacts",
+  {
+    id: text("id").primaryKey().$defaultFn(() => createId()),
+    listId: text("list_id")
+      .notNull()
+      .references(() => audienceLists.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    name: text("name"),
+    variables: text("variables"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+      .notNull(),
+  },
+  (table) => [
+    index("audienceContacts_listId_idx").on(table.listId),
+    uniqueIndex("audienceContacts_listId_email_unique").on(table.listId, table.email),
+  ],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   smtpConfigs: many(smtpConfig),
+  audienceLists: many(audienceLists),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -398,5 +441,20 @@ export const smtpConfigRelations = relations(smtpConfig, ({ one }) => ({
   user: one(user, {
     fields: [smtpConfig.userId],
     references: [user.id],
+  }),
+}));
+
+export const audienceListsRelations = relations(audienceLists, ({ one, many }) => ({
+  user: one(user, {
+    fields: [audienceLists.userId],
+    references: [user.id],
+  }),
+  contacts: many(audienceContacts),
+}));
+
+export const audienceContactsRelations = relations(audienceContacts, ({ one }) => ({
+  list: one(audienceLists, {
+    fields: [audienceContacts.listId],
+    references: [audienceLists.id],
   }),
 }));

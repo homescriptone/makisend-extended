@@ -7,6 +7,7 @@ import { ApiKeyRepository, ApiKeyService } from "@/api-keys";
 import { EmailLogRepository, EmailLogService } from "@/email-logs";
 import { DashboardRepository, DashboardService } from "@/dashboard";
 import { TemplateRepository, TemplateService } from "@/templates";
+import { AudienceRepository, AudienceService } from "@/audiences";
 import { IdempotencyRepository, IdempotencyService } from "@/idempotency";
 import {
   parseSendRateLimit,
@@ -25,6 +26,7 @@ import type { IApiKeyRepository } from "@/api-keys/api-keys.types";
 import type { IEmailLogRepository } from "@/email-logs/email-logs.types";
 import type { IDashboardRepository } from "@/dashboard/dashboard.types";
 import type { ITemplateRepository } from "@/templates/templates.types";
+import type { IAudienceRepository } from "@/audiences/audiences.types";
 import type { IIdempotencyRepository } from "@/idempotency";
 
 /**
@@ -61,22 +63,25 @@ export function createContainer(options: ContainerOptions = {}) {
     return database;
   }
 
-  // Auth instance: recreate if baseURL or frontend URL changes (e.g. first request
-  // before secrets are set).
+  // Auth instance: recreate if baseURL, frontend URL or database changes.
   let authInstance: ReturnType<typeof createAuth> | null = null;
   let authBaseUrl: string | null = null;
   let authFrontendUrl: string | null = null;
+  let authDatabase: Database | null = null;
 
   function getAuthInstance(rawEnv: Bindings, requestUrl?: string) {
     const env = withPublicUrls(rawEnv, requestUrl);
+    const db = getDatabase(rawEnv);
     if (
       !authInstance ||
       env.BETTER_AUTH_URL !== authBaseUrl ||
-      env.FRONTEND_URL !== authFrontendUrl
+      env.FRONTEND_URL !== authFrontendUrl ||
+      db !== authDatabase
     ) {
-      authInstance = createAuth(env, getDatabase(rawEnv));
+      authInstance = createAuth(env, db);
       authBaseUrl = env.BETTER_AUTH_URL ?? null;
       authFrontendUrl = env.FRONTEND_URL ?? null;
+      authDatabase = db;
     }
     return authInstance;
   }
@@ -88,6 +93,7 @@ export function createContainer(options: ContainerOptions = {}) {
     emailLogRepository: null as IEmailLogRepository | null,
     dashboardRepository: null as IDashboardRepository | null,
     templateRepository: null as ITemplateRepository | null,
+    audienceRepository: null as IAudienceRepository | null,
     idempotencyRepository: null as IIdempotencyRepository | null,
     sendRateLimitRepository: null as ISendRateLimitRepository | null,
     sendRateLimit: null as SendRateLimit | null,
@@ -96,16 +102,21 @@ export function createContainer(options: ContainerOptions = {}) {
     emailLogService: null as EmailLogService | null,
     dashboardService: null as DashboardService | null,
     templateService: null as TemplateService | null,
+    audienceService: null as AudienceService | null,
     idempotencyService: null as IdempotencyService | null,
     updateService: null as UpdateService | null,
     aesKey: null as EncryptionKeys | null,
     emailBinding: undefined as SendEmail | undefined,
     dbInitialized: false,
+    // The Database the current deps were built against. The singleton container
+    // is reused across tests that pass a fresh env/D1 per case, so we rebind when
+    // the request resolves to a different database (a no-op in the Worker).
+    initializedDatabase: null as Database | null,
 
     initDb(env: Bindings, requestUrl: string) {
-      if (this.dbInitialized) return;
-
       const db = getDatabase(env);
+      if (this.dbInitialized && this.initializedDatabase === db) return;
+
       const auth = getAuthInstance(env, requestUrl);
       this.emailRepository = new SendEmailRepository(db);
       this.smtpConfigRepository = new SmtpConfigRepository(db);
@@ -113,6 +124,7 @@ export function createContainer(options: ContainerOptions = {}) {
       this.emailLogRepository = new EmailLogRepository(db);
       this.dashboardRepository = new DashboardRepository(db);
       this.templateRepository = new TemplateRepository(db);
+      this.audienceRepository = new AudienceRepository(db);
       this.idempotencyRepository = new IdempotencyRepository(db);
       this.sendRateLimitRepository = new SendRateLimitRepository(db);
       this.sendRateLimit = parseSendRateLimit(env.SEND_RATE_LIMIT);
@@ -120,6 +132,15 @@ export function createContainer(options: ContainerOptions = {}) {
       this.emailBinding = env.EMAIL;
       this.updateService = createUpdateService(env);
       this.dbInitialized = true;
+      this.initializedDatabase = db;
+      // Services hold the old repositories; rebuild them for the new database.
+      this.smtpConfigService = null;
+      this.apiKeyService = null;
+      this.emailLogService = null;
+      this.dashboardService = null;
+      this.templateService = null;
+      this.audienceService = null;
+      this.idempotencyService = null;
     },
 
     initServices() {
@@ -132,6 +153,7 @@ export function createContainer(options: ContainerOptions = {}) {
       this.emailLogService = new EmailLogService(this.emailLogRepository!, this.aesKey!);
       this.dashboardService = new DashboardService(this.dashboardRepository!, this.aesKey!);
       this.templateService = new TemplateService(this.templateRepository!);
+      this.audienceService = new AudienceService(this.audienceRepository!);
       this.idempotencyService = new IdempotencyService(this.idempotencyRepository!);
     },
   };

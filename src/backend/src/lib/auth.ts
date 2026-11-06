@@ -42,7 +42,9 @@ export function createAuth(env: AuthEnv, db: Database) {
     }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
-    trustedOrigins: env.FRONTEND_URL ? [env.FRONTEND_URL] : [],
+    trustedOrigins: env.FRONTEND_URL
+      ? env.FRONTEND_URL.split(",").map((origin) => origin.trim()).filter(Boolean)
+      : [],
     emailAndPassword: {
       enabled: true,
     },

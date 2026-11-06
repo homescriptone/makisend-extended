@@ -7,6 +7,7 @@ import smtp from "./smtp"
 import apiKeys from "./apiKeys"
 import logs from "./logs"
 import templates from "./templates"
+import lists from "./lists"
 import settings from "./settings"
 import updates from "./updates"
 import apiDocs from "./apiDocs"
@@ -23,6 +24,7 @@ export default {
   ...apiKeys,
   ...logs,
   ...templates,
+  ...lists,
   ...settings,
   ...updates,
   ...apiDocs,

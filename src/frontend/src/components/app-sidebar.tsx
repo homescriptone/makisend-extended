@@ -20,6 +20,7 @@ import {
   KeyIcon,
   FileTextIcon,
   LayoutTemplateIcon,
+  UsersIcon,
   BookOpenIcon,
   Settings2Icon,
 } from "lucide-react"
@@ -51,6 +52,11 @@ const data: Record<"navMain" | "navSecondary", { titleKey: UiKey; url: string; i
       titleKey: "nav.templates",
       url: "/dashboard/templates",
       icon: <LayoutTemplateIcon />,
+    },
+    {
+      titleKey: "nav.lists",
+      url: "/dashboard/lists",
+      icon: <UsersIcon />,
     },
   ],
   navSecondary: [

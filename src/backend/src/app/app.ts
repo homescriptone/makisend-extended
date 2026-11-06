@@ -15,6 +15,7 @@ import { createApiKeysController } from "@/api-keys";
 import { createEmailLogsController } from "@/email-logs";
 import { createDashboardController } from "@/dashboard";
 import { createTemplatesController } from "@/templates";
+import { createAudiencesController } from "@/audiences";
 import { idempotencyMiddleware } from "@/idempotency";
 import { sendRateLimitMiddleware } from "@/send-rate-limit";
 import { openApiDocument } from "@/openapi";
@@ -234,6 +235,14 @@ export function createApp(container: Container) {
     return sessionMiddleware(auth)(c, next);
   });
   app.route("/templates", templatesController);
+
+  // Audience lists and contacts (dashboard, session auth).
+  const audiencesController = createAudiencesController(() => deps.audienceService!);
+  app.use("/audiences*", async (c, next) => {
+    const auth = getAuthInstance(c.env, c.req.url);
+    return sessionMiddleware(auth)(c, next);
+  });
+  app.route("/audiences", audiencesController);
 
   // New-release check, shown as a banner on the dashboard (session auth).
   const updatesController = createUpdatesController(() => deps.updateService!);

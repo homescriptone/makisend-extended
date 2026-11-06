@@ -5,6 +5,7 @@ export default {
   "nav.apiKeys": "API keys",
   "nav.emailLogs": "Email logs",
   "nav.templates": "Templates",
+  "nav.lists": "Lists",
   "nav.apiReference": "API reference",
   "nav.settings": "Settings",
   "nav.toggleSidebar": "Toggle sidebar",
@@ -23,6 +24,7 @@ export default {
   "nav.title.apiKeys": "API keys - MakiSend",
   "nav.title.emailLogs": "Email logs - MakiSend",
   "nav.title.templates": "Templates - MakiSend",
+  "nav.title.lists": "Lists - MakiSend",
   "nav.title.apiDocs": "API reference - MakiSend",
   "nav.title.settings": "Settings - MakiSend",
 }
