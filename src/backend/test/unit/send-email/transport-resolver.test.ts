@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTestD1, cleanupTestD1 } from "../../helpers/d1-setup";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { encrypt } from "@/core/crypto";
 import { smtpConfig, user } from "@/db/schema";
 import {
@@ -20,7 +20,7 @@ describe("SMTP transport resolution", () => {
   let env: Bindings;
 
   async function insertConfig(id: string, isActive: boolean, port = 465, host = "smtp.example.com") {
-    const db = createDatabase(env.makisend_db);
+    const db = createDatabase({ provider: "d1", binding: env.makisend_db });
     await db.insert(smtpConfig).values({
       id,
       userId: "resolver-user",
@@ -45,7 +45,7 @@ describe("SMTP transport resolution", () => {
       FRONTEND_URL: "http://localhost:4321",
     } as unknown as Bindings;
 
-    const db = createDatabase(env.makisend_db);
+    const db = createDatabase({ provider: "d1", binding: env.makisend_db });
     await db.insert(user).values({
       id: "resolver-user",
       name: "Resolver User",

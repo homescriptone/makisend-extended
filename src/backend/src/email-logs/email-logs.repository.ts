@@ -1,5 +1,5 @@
 import { emailLogs, emailHistories, apikey } from "@/db/schema";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import type {
   EmailLogRecord,
   EmailHistoryRecord,

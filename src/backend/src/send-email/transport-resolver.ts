@@ -3,7 +3,7 @@ import { smtpConfig as smtpConfigTable } from "@/db/schema";
 import { decrypt } from "@/core/crypto";
 import { AppError } from "@/core/errors";
 import { pinoLogger } from "@/core/logger";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { SmtpEmailTransport } from "@/transports";
 import { CloudflareEmailTransport } from "./cloudflare-email.transport";
 import { isCloudflareEmailHost } from "@/smtp-config/smtp-host";
@@ -22,7 +22,7 @@ export async function findSmtpRecord(
   env: Bindings,
   smtpConfigId?: string,
 ): Promise<SmtpConfigRow | undefined> {
-  const db = createDatabase(env.makisend_db);
+  const db = createDatabase({ provider: "d1", binding: env.makisend_db });
 
   if (smtpConfigId) {
     const [byId] = await db

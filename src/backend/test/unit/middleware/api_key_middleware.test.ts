@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { apiKeyMiddleware } from "@/middleware/api-key.middleware";
 import { errorHandler } from "@/middleware/error.handler";
-import * as dbModule from "@/db/connection";
+import * as dbModule from "@/db/d1";
 import * as cryptoModule from "@/core/crypto";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import type { Bindings } from "@/index";
 import type { Config } from "@/config/config";
 import type { UserInfoVariables } from "@/index";
 
-vi.mock("@/db/connection");
+vi.mock("@/db/d1");
 vi.mock("@/core/crypto");
 
 type AppEnv = {
@@ -221,7 +221,7 @@ describe("API Key Middleware", () => {
         headers: { "x-api-key": "mk.my-secret-key" },
       });
 
-      expect(dbModule.createDatabase).toHaveBeenCalledWith(mockConfig.db);
+      expect(dbModule.createDatabase).toHaveBeenCalledWith({ provider: "d1", binding: mockConfig.db });
       expect(mockDbQuery.where).toHaveBeenCalled();
     });
 

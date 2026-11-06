@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createTestD1, cleanupTestD1 } from "../../helpers/d1-setup";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { emailLogs, smtpConfig, user } from "@/db/schema";
 import { app } from "@/index";
 import type { Bindings } from "@/index";
@@ -72,8 +72,8 @@ describe("POST /api/auth/delete-user with owned data", () => {
     expect(keyRes.status).toBe(201);
     const keyId = ((await keyRes.json()) as { record: { id: string } }).record.id;
 
-    await createDatabase(env.makisend_db).insert(emailLogs).values({
-      userId: (await createDatabase(env.makisend_db).select().from(smtpConfig))[0].userId,
+    await createDatabase({ provider: "d1", binding: env.makisend_db }).insert(emailLogs).values({
+      userId: (await createDatabase({ provider: "d1", binding: env.makisend_db }).select().from(smtpConfig))[0].userId,
       apiKeyId: keyId,
       to: "to@example.com",
       subject: "hi",
@@ -87,7 +87,7 @@ describe("POST /api/auth/delete-user with owned data", () => {
   });
 
   it("deletes the account", { timeout: 30000 }, async () => {
-    const before = await createDatabase(env.makisend_db).select().from(emailLogs);
+    const before = await createDatabase({ provider: "d1", binding: env.makisend_db }).select().from(emailLogs);
     expect(before).toHaveLength(1);
 
     const res = await app.request(
@@ -102,7 +102,7 @@ describe("POST /api/auth/delete-user with owned data", () => {
     const body = await res.text();
     expect(res.status, body).toBe(200);
 
-    const db = createDatabase(env.makisend_db);
+    const db = createDatabase({ provider: "d1", binding: env.makisend_db });
     const logs = await db.select().from(emailLogs);
     const users = await db.select().from(user);
 

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Miniflare } from "miniflare";
 
 import { decrypt, encrypt, keyId } from "@/core/crypto";
+import { createDatabase } from "@/db/d1";
 import { ENCRYPTED_COLUMNS, KeyRotationRepository, KeyRotationService } from "@/key-rotation";
 import { cleanupTestD1, createTestD1 } from "../../helpers/d1-setup";
 
@@ -17,9 +18,11 @@ async function legacyCiphertext(plainText: string, keyHex: string): Promise<stri
 describe("KeyRotationService (real D1)", () => {
   let mf: Miniflare;
   let d1: D1Database;
+  let db: ReturnType<typeof createDatabase>;
 
   beforeAll(async () => {
     ({ mf, d1 } = await createTestD1());
+    db = createDatabase({ provider: "d1", binding: d1 });
   });
 
   afterAll(async () => {
@@ -62,7 +65,7 @@ describe("KeyRotationService (real D1)", () => {
   }
 
   const service = (batchSize?: number) =>
-    new KeyRotationService(new KeyRotationRepository(d1), KEYS, ENCRYPTED_COLUMNS, batchSize);
+    new KeyRotationService(new KeyRotationRepository(db), KEYS, ENCRYPTED_COLUMNS, batchSize);
 
   it("re-encrypts every stale value with the current key and leaves the plaintext unchanged", async () => {
     await seed();
@@ -122,7 +125,7 @@ describe("KeyRotationService (real D1)", () => {
 
   it("never overwrites a value changed after it was read", async () => {
     await seed();
-    const repository = new KeyRotationRepository(d1);
+    const repository = new KeyRotationRepository(db);
     const column = ENCRYPTED_COLUMNS.find((c) => c.column === "smtppassword")!;
     const [stale] = await repository.findStale(column, `{"kid":"${await keyId(NEW_KEY)}"%`, 10);
     const edited = await encrypt("new-password", NEW_KEY);

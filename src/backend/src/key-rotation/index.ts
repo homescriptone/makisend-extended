@@ -1,5 +1,6 @@
 import { resolveEncryptionKeys } from "@/config/config";
 import { pinoLogger } from "@/core/logger";
+import { createDatabase } from "@/db/d1";
 import type { Bindings } from "@/app/env";
 import { ENCRYPTED_COLUMNS, KeyRotationRepository } from "./key-rotation.repository";
 import { KeyRotationService } from "./key-rotation.service";
@@ -18,7 +19,7 @@ export type * from "./key-rotation.types";
  */
 export async function runKeyRotation(env: Bindings): Promise<void> {
   const service = new KeyRotationService(
-    new KeyRotationRepository(env.makisend_db),
+    new KeyRotationRepository(createDatabase({ provider: "d1", binding: env.makisend_db })),
     resolveEncryptionKeys(env),
     ENCRYPTED_COLUMNS,
   );

@@ -10,7 +10,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import type { Miniflare } from "miniflare";
-import { createDatabase, type Database } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
+import type { Database } from "@/db/client";
 import { apikey, sendRateLimit, user } from "@/db/schema";
 import { AppError } from "@/core/errors";
 import { errorHandler } from "@/middleware/error.handler";
@@ -69,7 +70,7 @@ describe("send rate limit middleware (real D1)", () => {
   beforeEach(async () => {
     const testD1 = await createTestD1();
     mf = testD1.mf;
-    db = createDatabase(testD1.d1);
+    db = createDatabase({ provider: "d1", binding: testD1.d1 });
     repository = new SendRateLimitRepository(db);
     clock = 1_000_000;
     limit = null;

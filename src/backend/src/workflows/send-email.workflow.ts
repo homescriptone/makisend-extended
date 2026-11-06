@@ -1,7 +1,7 @@
 import { resolveEncryptionKeys } from "@/config/config";
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { SendEmailRepository } from "@/send-email/send-email.repository";
 import { loadEmailForSending } from "@/send-email/send-email.loader";
 import { resolveTransportFor } from "@/send-email/transport-resolver";
@@ -40,7 +40,7 @@ export class SendEmailWorkflow extends WorkflowEntrypoint<Bindings, SendEmailPar
     const env = this.env;
     // Fresh repository per run: the instance may outlive the isolate that
     // started it, so nothing may be cached across durable executions.
-    const repository = new SendEmailRepository(createDatabase(env.makisend_db));
+    const repository = new SendEmailRepository(createDatabase({ provider: "d1", binding: env.makisend_db }));
 
     return runSendEmailFlow(
       {

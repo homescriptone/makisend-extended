@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestD1, cleanupTestD1 } from "../../helpers/d1-setup";
 import { app } from "@/index";
 import type { Bindings } from "@/index";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { smtpConfig, user } from "@/db/schema";
 import { encrypt } from "@/core/crypto";
 
@@ -69,7 +69,7 @@ describe("POST /smtp-config/:id/test-send", () => {
 
     ownerCookie = await signUp("owner@example.com");
 
-    const db = createDatabase(testD1.d1);
+    const db = createDatabase({ provider: "d1", binding: testD1.d1 });
     await db.insert(user).values({ id: "stranger-id", name: "Stranger", email: "stranger@example.com", emailVerified: true });
     strangerConfigId = "stranger-config-id";
     await db.insert(smtpConfig).values({

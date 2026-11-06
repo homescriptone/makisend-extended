@@ -67,7 +67,7 @@ function addCorsHeaders(
  * entry point.
  */
 export function createApp(container: Container) {
-  const { deps, getAuthInstance } = container;
+  const { deps, getAuthInstance, getDatabase } = container;
   const app = new Hono<{ Bindings: Bindings; Variables: UserInfoVariables }>();
 
   // Global middleware: security headers, CORS, request logging, error handling, config injection
@@ -98,7 +98,7 @@ export function createApp(container: Container) {
   // account exists the dashboard sends every visitor to the set-up page, where the first
   // connection creates the super admin.
   app.get("/api/setup-status", async (c) => {
-    const setup = await needsSetup(c.env.makisend_db);
+    const setup = await needsSetup(getDatabase(c.env));
     const keyError = checkEncryptionKeys(c.env);
     if (!keyError) return c.json({ needsSetup: setup });
     return c.json({ needsSetup: setup, configError: { code: keyError.code, variables: keyError.variables } });

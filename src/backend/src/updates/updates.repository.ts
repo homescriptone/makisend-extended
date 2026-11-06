@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import { updateCheck } from "@/db/schema";
 import type { IUpdateCheckRepository, UpdateCheckRecord } from "./updates.types";
 

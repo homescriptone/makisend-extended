@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { idempotencyKeys } from "@/db/schema";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import type {
   CreateIdempotencyRecordInput,
   IdempotencyRecord,

@@ -1,5 +1,5 @@
 import { emailLogs, emailHistories, emailContents, emailAttachments } from "@/db/schema";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import type {
   IEmailRepository,
   PendingEmailLogOptions,

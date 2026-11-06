@@ -15,7 +15,7 @@ import {
   IdempotencyService,
   idempotencyMiddleware,
 } from "@/idempotency";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { sendEmailQueueConsumer } from "@/queue/send-email.consumer";
 import { encrypt, decrypt } from "@/core/crypto";
 import {
@@ -63,7 +63,7 @@ describe("POST /send-email — HTTP layer integration", () => {
     const testD1 = await createTestD1();
     mf = testD1.mf;
     db = testD1.db;
-    emailRepository = new SendEmailRepository(createDatabase(testD1.d1));
+    emailRepository = new SendEmailRepository(createDatabase({ provider: "d1", binding: testD1.d1 }));
 
     auth = betterAuth({
       database: drizzleAdapter(db, {
@@ -124,7 +124,7 @@ describe("POST /send-email — HTTP layer integration", () => {
       findById: vi.fn().mockResolvedValue(null),
     } as unknown as ITemplateRepository;
     idempotencyService = new IdempotencyService(
-      new IdempotencyRepository(createDatabase(testD1.d1)),
+      new IdempotencyRepository(createDatabase({ provider: "d1", binding: testD1.d1 })),
     );
 
     app = new Hono<AppEnv>();

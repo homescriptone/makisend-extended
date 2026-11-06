@@ -7,7 +7,7 @@ import {
   IdempotencyService,
   idempotencyMiddleware,
 } from "@/idempotency";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { AppError } from "@/core/errors";
 import { createTestD1, cleanupTestD1 } from "../../helpers/d1-setup";
 import type { Bindings, UserInfoVariables } from "@/index";
@@ -42,7 +42,7 @@ describe("idempotencyMiddleware", () => {
     const testD1 = await createTestD1();
     mf = testD1.mf;
     service = new IdempotencyService(
-      new IdempotencyRepository(createDatabase(testD1.d1)),
+      new IdempotencyRepository(createDatabase({ provider: "d1", binding: testD1.d1 })),
     );
 
     handler = (c) => {

@@ -297,14 +297,14 @@ The repository was moved into a `src/` layout (`src/backend`, `src/frontend`) wi
 
 1. `src/backend/src/index.ts` is the only entry point: it exports the Worker shape (`fetch`, `queue`, `scheduled`) plus the `SendEmailWorkflow` class, and owns the lazy dependency container.
 2. The `Bindings` type is imported by `src/backend/src/config/config.ts` and `src/backend/src/lib/auth.ts`, so configuration depends on Cloudflare binding types.
-3. `src/backend/src/db/connection.ts` hardcodes `drizzle-orm/d1`; `src/backend/src/lib/auth.ts` creates a second D1-backed Drizzle instance for Better Auth.
+3. **Resolved in S2.** The database sits behind the `Database` port (`src/backend/src/db/client.ts`) with separate `d1.ts`, `sqlite.ts` and `turso.ts` adapters, and `createAuth(env, db)` receives the shared instance instead of opening its own D1 client. What remains for the Node runtime: `Config.db` is still typed as `D1Database` and `createConfig` still requires `makisend_db` (see S6).
 4. `src/backend/src/send-email/send-email.controller.ts` calls `c.env.SEND_EMAIL_QUEUE.send(...)` directly — queue access leaks into the HTTP layer.
 5. `src/backend/src/queue/send-email.consumer.ts` depends on the Cloudflare `MessageBatch` API (`ack`, `retry`, `attempts`).
 6. `src/backend/src/workflows/send-email.workflow.ts` and `send-email.flow.ts` depend on `cloudflare:workers` (`WorkflowEntrypoint`, `WorkflowStep`); the Vitest config already shims the module with `test/mocks/cloudflare-workers.ts`, which proves the coupling.
 7. The `scheduled` handler relies on `ctx.waitUntil` and cron strings declared in `wrangler.jsonc`; the VPS image reimplements this with `docker/scheduler.mjs` calling `/cdn-cgi/handler/scheduled`.
 8. Cloudflare Email Service (`send_email` binding) branches are spread across `transport-resolver.ts`, `smtp-config.service.ts` and `smtp-health.ts`.
 9. Static files are served by the platform (`assets.directory`); there is no Node static server.
-10. Tests run D1 through Miniflare/workerd (`test/helpers/d1-setup.ts`); there is no local SQLite driver path yet, although `better-sqlite3` is already a dev dependency.
+10. **Resolved in S2.** `test/integration/sqlite.test.ts` applies the same Drizzle migrations and exercises the repositories, Better Auth and the owner lock on better-sqlite3 and on libSQL. D1 coverage still runs through Miniflare/workerd (`test/helpers/d1-setup.ts`), as it should.
 
 #### Target structure (adapter boundaries)
 
@@ -319,7 +319,10 @@ src/backend/src/
 ├── core/                     # unchanged shared kernel
 ├── db/
 │   ├── schema.ts             # unchanged Drizzle schema
-│   └── client.ts             # Database type + createDatabase(provider)
+│   ├── client.ts             # Database port: shared type + affectedRows()
+│   ├── d1.ts                 # Cloudflare D1 adapter (Worker entry graph)
+│   ├── sqlite.ts             # better-sqlite3 adapter (Node runtime, tests)
+│   └── turso.ts              # libSQL / Turso adapter (local file or remote)
 ├── domain/                   # business modules, unchanged internals
 │   ├── send-email/  templates/  smtp-config/  email-logs/  dashboard/
 │   ├── idempotency/  api-keys/  send-rate-limit/  key-rotation/  updates/
@@ -346,7 +349,7 @@ The current `src/index.ts` keeps working during the migration: it becomes a thin
 |---|---|---|---|
 | S0 | Repair the `src/` restructure | install, lint, typecheck, tests, build and both `wrangler deploy --dry-run` pass | done (6 Nov 2026) |
 | S1 | Extract `app/env.ts`, `app/container.ts`, `app/app.ts`; `src/index.ts` becomes `runtime/cloudflare/entry.ts` re-exported from the old path | no behavior change, tests unchanged | done (6 Nov 2026) |
-| S2 | Database port: `createDatabase({ provider: "d1" \| "sqlite" \| "turso" })`; Better Auth receives the shared `Database` instance | D1 tests pass; new SQLite integration test applies the same migrations | planned |
+| S2 | Database port: `createDatabase({ provider: "d1" \| "sqlite" \| "turso" })`; Better Auth receives the shared `Database` instance | D1 tests pass; new SQLite integration test applies the same migrations | done (6 Nov 2026) |
 | S3 | Job queue port: `JobQueue.enqueue(emailId)` injected into the send-email controller; Cloudflare and local adapters | controller no longer reads `c.env`; queue tests cover both adapters | planned |
 | S4 | Workflow port: `SendEmailFlow` runs steps through a `StepRunner`; Cloudflare adapter wraps `WorkflowStep`, local adapter executes with the same retry budget | workflow tests run against both runners | planned |
 | S5 | Scheduler port: cron dispatch behind `Scheduler`; Cloudflare events and local timer share one dispatcher | `docker/scheduler.mjs` replaced by the Node runtime scheduler | planned |
@@ -371,6 +374,14 @@ The initial root `Makefile` exists: `make help` lists every target (`install`,
 `setup`, `dev`, `build`, `test`, `lint`, `typecheck`, `migrate`, `db-reset`,
 Docker targets, `deploy`); `start` and `worker` fail with a clear "planned, S6"
 message until the standalone runtime lands.
+
+S2 (database port) is done as well: repositories depend on the shared
+`Database` type, `db/d1.ts`, `db/sqlite.ts` and `db/turso.ts` implement it,
+`createContainer({ database })` lets a runtime choose the adapter, and Better
+Auth no longer opens a second Drizzle client. `test/integration/sqlite.test.ts`
+applies the same migrations and runs the repositories, Better Auth and the
+owner lock on better-sqlite3 and libSQL; the full suite is 47 files / 542 tests
+and both Wrangler dry-runs still bundle.
 
 **Exit criteria:** Existing Cloudflare deployment and behavior continue to work, while infrastructure-specific dependencies are isolated behind explicit boundaries.
 

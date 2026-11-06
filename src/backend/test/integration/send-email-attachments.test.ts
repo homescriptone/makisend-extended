@@ -34,7 +34,7 @@ import { loadEmailForSending } from "@/send-email/send-email.loader";
 import { SmtpEmailTransport } from "@/transports";
 import { TemplateRepository } from "@/templates/templates.repository";
 import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES } from "@/send-email/attachments";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { emailAttachments, emailLogs, user } from "@/db/schema";
 import { ENCRYPTED_COLUMNS } from "@/key-rotation/key-rotation.repository";
 import { createTestD1, cleanupTestD1 } from "../helpers/d1-setup";
@@ -138,7 +138,7 @@ describe("POST /send-email — attachments (Resend's shape)", () => {
     const testD1 = await createTestD1();
     mf = testD1.mf;
     d1 = testD1.d1;
-    repository = new SendEmailRepository(createDatabase(d1));
+    repository = new SendEmailRepository(createDatabase({ provider: "d1", binding: d1 }));
     // email_logs has no FK to a user row: the controller writes the id it is given.
     queue = vi.fn().mockResolvedValue(undefined);
     app = new Hono();
@@ -149,7 +149,7 @@ describe("POST /send-email — attachments (Resend's shape)", () => {
       c.set("smtpConfigId", null as unknown as string);
       await next();
     });
-    templates = new TemplateRepository(createDatabase(d1));
+    templates = new TemplateRepository(createDatabase({ provider: "d1", binding: d1 }));
     app.route("/send-email", createSendEmailController(() => repository, () => templates));
   });
   afterEach(async () => {
@@ -178,7 +178,7 @@ describe("POST /send-email — attachments (Resend's shape)", () => {
     expect(Object.keys(message)).toEqual(["emailId"]);
 
     // A3: nothing readable in D1.
-    const rows = await createDatabase(d1).select().from(emailAttachments).where(eq(emailAttachments.emailId, message.emailId));
+    const rows = await createDatabase({ provider: "d1", binding: d1 }).select().from(emailAttachments).where(eq(emailAttachments.emailId, message.emailId));
     expect(rows.map((r) => [r.position, r.filename, r.contentType])).toEqual([
       [0, "recu-REC-1.pdf", "application/pdf"],
       [1, "detail.csv", "application/octet-stream"],
@@ -215,14 +215,14 @@ describe("POST /send-email — attachments (Resend's shape)", () => {
     const { emailId } = queue.mock.calls[0][0] as SendEmailQueueMessage;
     const email = await loadEmailForSending(repository, AES_KEY, emailId);
     expect(email).toEqual({ ...base, smtpConfigId: null });
-    expect(await createDatabase(d1).select().from(emailAttachments).all()).toEqual([]);
+    expect(await createDatabase({ provider: "d1", binding: d1 }).select().from(emailAttachments).all()).toEqual([]);
     artefact["A4:keys"] = Object.keys(email).sort();
   });
 
   it("A8 — deleting the e-mail deletes its attachments", async () => {
     await post({ ...base, attachments: [{ filename: "a.pdf", content: b64(PDF) }] });
     const { emailId } = queue.mock.calls[0][0] as SendEmailQueueMessage;
-    const db = createDatabase(d1);
+    const db = createDatabase({ provider: "d1", binding: d1 });
     await d1.exec("PRAGMA foreign_keys = ON");
     await db.delete(emailLogs).where(eq(emailLogs.internalId, emailId));
     expect(await db.select().from(emailAttachments).all()).toEqual([]);
@@ -272,7 +272,7 @@ describe("POST /send-email — attachments (Resend's shape)", () => {
   });
 
   it("A9 — a templated send keeps its attachments", async () => {
-    await createDatabase(d1).insert(user).values({ id: "user-1", name: "Owner", email: "owner@example.com" });
+    await createDatabase({ provider: "d1", binding: d1 }).insert(user).values({ id: "user-1", name: "Owner", email: "owner@example.com" });
     const template = await templates.create("user-1", {
       name: "Reçu",
       subject: "Votre reçu {{ref}}",

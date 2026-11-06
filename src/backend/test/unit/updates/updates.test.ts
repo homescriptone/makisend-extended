@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Miniflare } from "miniflare";
 import { APP_VERSION, compareVersions, normalizeVersion } from "@/core/version";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { updateCheck } from "@/db/schema";
 import { app, type Bindings } from "@/index";
 import {
@@ -306,7 +306,7 @@ describe("U7 UpdateCheckRepository (real D1)", () => {
     const setup = await createTestD1();
     mf = setup.mf;
     d1 = setup.d1;
-    repository = new UpdateCheckRepository(createDatabase(d1));
+    repository = new UpdateCheckRepository(createDatabase({ provider: "d1", binding: d1 }));
   });
 
   afterEach(async () => {
@@ -329,7 +329,7 @@ describe("U7 UpdateCheckRepository (real D1)", () => {
     await repository.save({ ...first, latestVersion: "0.3.0", checkedAt: 2, error: "boom" });
 
     expect(await repository.get()).toEqual({ ...first, latestVersion: "0.3.0", checkedAt: 2, error: "boom" });
-    expect(await createDatabase(d1).select().from(updateCheck)).toHaveLength(1);
+    expect(await createDatabase({ provider: "d1", binding: d1 }).select().from(updateCheck)).toHaveLength(1);
   });
 });
 

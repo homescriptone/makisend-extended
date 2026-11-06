@@ -19,6 +19,7 @@ import { createOTP } from "@better-auth/utils/otp";
 import { createTestD1, cleanupTestD1 } from "../../helpers/d1-setup";
 import { app } from "@/index";
 import type { Bindings } from "@/index";
+import { createDatabase } from "@/db/d1";
 import { claimOwnership, OWNER_CLAIM_TTL_MS, SETUP_COMPLETE_MESSAGE } from "@/lib/owner-lock";
 import { INVALID_TOTP_SIGN_IN } from "@/lib/totp-sign-in";
 
@@ -30,6 +31,7 @@ const KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 let env: Bindings;
 let mf: Parameters<typeof cleanupTestD1>[0];
 let d1: D1Database;
+let db: ReturnType<typeof createDatabase>;
 // The auth singleton is cached per BETTER_AUTH_URL (src/index.ts): a new URL per test binds it
 // to that test's fresh database.
 let run = 0;
@@ -100,6 +102,7 @@ beforeEach(async () => {
   const testD1 = await createTestD1();
   mf = testD1.mf;
   d1 = testD1.d1;
+  db = createDatabase({ provider: "d1", binding: d1 });
   run++;
   env = {
     ENCRYPTION_KEY: KEY,
@@ -178,15 +181,15 @@ describe("super admin created at the first connection", () => {
 
   it("frees a claim whose account was never created, after the TTL (A3)", async () => {
     const now = Date.now();
-    expect(await claimOwnership(d1, now)).toBe(true);
+    expect(await claimOwnership(db, now)).toBe(true);
     // Another creation inside the TTL is refused; after it, the claim is taken over.
-    expect(await claimOwnership(d1, now + 1)).toBe(false);
-    expect(await claimOwnership(d1, now + OWNER_CLAIM_TTL_MS + 1)).toBe(true);
+    expect(await claimOwnership(db, now + 1)).toBe(false);
+    expect(await claimOwnership(db, now + OWNER_CLAIM_TTL_MS + 1)).toBe(true);
   });
 
   it("never frees the instance while an account exists, whatever the claim's age (A1)", async () => {
     await signUp();
-    expect(await claimOwnership(d1, Date.now() + 10 * OWNER_CLAIM_TTL_MS)).toBe(false);
+    expect(await claimOwnership(db, Date.now() + 10 * OWNER_CLAIM_TTL_MS)).toBe(false);
   });
 
   it("sets the instance up again after the account is deleted (A4)", async () => {

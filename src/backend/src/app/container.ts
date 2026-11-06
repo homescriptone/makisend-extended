@@ -1,5 +1,5 @@
 import { resolveEncryptionKeys } from "@/config/config";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { createAuth } from "@/lib/auth";
 import { SendEmailRepository } from "@/send-email/send-email.repository";
 import { SmtpConfigRepository, SmtpConfigService } from "@/smtp-config";
@@ -18,6 +18,7 @@ import { createUpdateService, type UpdateService } from "@/updates";
 import { withPublicUrls, type Bindings } from "./env";
 
 import type { EncryptionKeys } from "@/core/crypto";
+import type { Database } from "@/db/client";
 import type { IEmailRepository } from "@/send-email/send-email.types";
 import type { ISmtpConfigRepository } from "@/smtp-config/smtp-config.types";
 import type { IApiKeyRepository } from "@/api-keys/api-keys.types";
@@ -31,10 +32,35 @@ import type { IIdempotencyRepository } from "@/idempotency";
  *
  * Created once per runtime entry point (src/runtime/cloudflare/entry.ts today,
  * src/runtime/node/server.ts later). Nothing runtime-specific lives here: the
- * container only needs the bindings' database handle, encryption keys and the
+ * container needs a database factory, the bindings' encryption keys and the
  * optional Cloudflare Email Service binding.
  */
-export function createContainer() {
+export interface ContainerOptions {
+  /**
+   * Opens the shared database for a request's bindings. Defaults to Cloudflare
+   * D1; the Node runtime passes the SQLite adapter instead.
+   */
+  database?: (env: Bindings) => Database;
+}
+
+export function createContainer(options: ContainerOptions = {}) {
+  const openDatabase =
+    options.database ?? ((env: Bindings) => createDatabase({ provider: "d1", binding: env.makisend_db }));
+
+  // One Database per bindings object: the repositories and Better Auth must see
+  // the same instance (a SQLite file adapter opens one connection, not two).
+  // Tests build a fresh env per case, which re-opens the database for that case.
+  let database: Database | null = null;
+  let databaseEnv: Bindings | null = null;
+
+  function getDatabase(rawEnv: Bindings): Database {
+    if (!database || databaseEnv !== rawEnv) {
+      database = openDatabase(rawEnv);
+      databaseEnv = rawEnv;
+    }
+    return database;
+  }
+
   // Auth instance: recreate if baseURL or frontend URL changes (e.g. first request
   // before secrets are set).
   let authInstance: ReturnType<typeof createAuth> | null = null;
@@ -48,7 +74,7 @@ export function createContainer() {
       env.BETTER_AUTH_URL !== authBaseUrl ||
       env.FRONTEND_URL !== authFrontendUrl
     ) {
-      authInstance = createAuth(env);
+      authInstance = createAuth(env, getDatabase(rawEnv));
       authBaseUrl = env.BETTER_AUTH_URL ?? null;
       authFrontendUrl = env.FRONTEND_URL ?? null;
     }
@@ -79,7 +105,7 @@ export function createContainer() {
     initDb(env: Bindings, requestUrl: string) {
       if (this.dbInitialized) return;
 
-      const db = createDatabase(env.makisend_db);
+      const db = getDatabase(env);
       const auth = getAuthInstance(env, requestUrl);
       this.emailRepository = new SendEmailRepository(db);
       this.smtpConfigRepository = new SmtpConfigRepository(db);
@@ -110,7 +136,7 @@ export function createContainer() {
     },
   };
 
-  return { deps, getAuthInstance };
+  return { deps, getAuthInstance, getDatabase };
 }
 
 export type Container = ReturnType<typeof createContainer>;

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import { sendRateLimit } from "@/db/schema";
 import type { ISendRateLimitRepository, SendRateLimitHit } from "./send-rate-limit.types";
 

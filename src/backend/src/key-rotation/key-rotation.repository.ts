@@ -1,3 +1,5 @@
+import { sql } from "drizzle-orm";
+import { affectedRows, type Database } from "@/db/client";
 import type { EncryptedColumn, IKeyRotationRepository } from "./key-rotation.types";
 
 /**
@@ -18,31 +20,28 @@ export const ENCRYPTED_COLUMNS: readonly EncryptedColumn[] = [
 ];
 
 const quote = (identifier: string) => `"${identifier}"`;
+/** Identifiers come from ENCRYPTED_COLUMNS (constants), never from a request. */
+const identifier = (name: string) => sql.raw(quote(name));
 
 export class KeyRotationRepository implements IKeyRotationRepository {
-  constructor(private readonly db: D1Database) {}
+  constructor(private readonly db: Database) {}
 
   async findStale(target: EncryptedColumn, currentPrefix: string, limit: number) {
     const { table, primaryKey, column } = target;
-    const { results } = await this.db
-      .prepare(
-        `SELECT ${quote(primaryKey)} AS id, ${quote(column)} AS value FROM ${quote(table)}
-         WHERE ${quote(column)} <> '' AND ${quote(column)} NOT LIKE ?1 LIMIT ?2`,
-      )
-      .bind(currentPrefix, limit)
-      .all<{ id: string; value: string }>();
-    return results;
+    return this.db.all<{ id: string; value: string }>(sql`
+      SELECT ${identifier(primaryKey)} AS id, ${identifier(column)} AS value
+      FROM ${identifier(table)}
+      WHERE ${identifier(column)} <> '' AND ${identifier(column)} NOT LIKE ${currentPrefix}
+      LIMIT ${limit}
+    `);
   }
 
   async countStale(target: EncryptedColumn, currentPrefix: string): Promise<number> {
     const { table, column } = target;
-    const row = await this.db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM ${quote(table)}
-         WHERE ${quote(column)} <> '' AND ${quote(column)} NOT LIKE ?1`,
-      )
-      .bind(currentPrefix)
-      .first<{ n: number }>();
+    const row = await this.db.get<{ n: number }>(sql`
+      SELECT COUNT(*) AS n FROM ${identifier(table)}
+      WHERE ${identifier(column)} <> '' AND ${identifier(column)} NOT LIKE ${currentPrefix}
+    `);
     return row?.n ?? 0;
   }
 
@@ -52,13 +51,10 @@ export class KeyRotationRepository implements IKeyRotationRepository {
    */
   async replace(target: EncryptedColumn, id: string, previous: string, next: string): Promise<boolean> {
     const { table, primaryKey, column } = target;
-    const result = await this.db
-      .prepare(
-        `UPDATE ${quote(table)} SET ${quote(column)} = ?1
-         WHERE ${quote(primaryKey)} = ?2 AND ${quote(column)} = ?3`,
-      )
-      .bind(next, id, previous)
-      .run();
-    return (result.meta.changes ?? 0) > 0;
+    const result = await this.db.run(sql`
+      UPDATE ${identifier(table)} SET ${identifier(column)} = ${next}
+      WHERE ${identifier(primaryKey)} = ${id} AND ${identifier(column)} = ${previous}
+    `);
+    return affectedRows(result) > 0;
   }
 }

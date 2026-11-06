@@ -135,14 +135,16 @@ source of truth — run `pnpm cf-typegen` (see the developer guide).
 makisend-poc/
 ├── src/backend/                  # Cloudflare Worker (package `makisend-poc`)
 │   ├── src/
-│   │   ├── index.ts          # Bindings, middleware order, DI, routes, exports
+│   │   ├── index.ts          # Thin re-export of runtime/cloudflare/entry.ts
+│   │   ├── app/              # env.ts (bindings/types), container.ts (DI), app.ts (Hono)
+│   │   ├── runtime/          # Runtime entry points (cloudflare/entry.ts today, node/ later)
 │   │   ├── api-keys/         # Per-user API key CRUD (Better Auth)
 │   │   ├── config/           # Bindings → typed Config
 │   │   ├── core/             # AppError, Pino, AES-GCM, sanitizer, bootstrap
 │   │   ├── dashboard/        # Aggregated delivery metrics
-│   │   ├── db/               # Drizzle schema + D1 factory
+│   │   ├── db/               # Drizzle schema, Database port, D1/SQLite/libSQL adapters
 │   │   ├── email-logs/       # Log listing + history
-│   │   ├── lib/auth.ts       # Better Auth instance
+│   │   ├── lib/auth.ts       # Better Auth instance (takes the shared Database)
 │   │   ├── middleware/       # API key, session, config, errors, logging
 │   │   ├── queue/            # Queue consumer → workflow
 │   │   ├── send-email/       # HTTP → queue orchestration + SMTP transport
@@ -167,7 +169,8 @@ The backend follows a **NestJS-inspired module pattern**:
 
 - **Controller** — HTTP only: validation, context reads, response shaping.
 - **Service** — business rules, ownership checks, orchestration.
-- **Repository** — Drizzle/D1 persistence behind an interface.
+- **Repository** — persistence through the `Database` port (`db/client.ts`),
+  implemented by Drizzle on D1, better-sqlite3 or libSQL.
 - **DTO** — Zod schemas + inferred types.
 - **Barrel `index.ts`** — module public surface.
 
@@ -183,7 +186,7 @@ orchestration.
 
 1. **CORS** — `origin: (origin) => origin`, `credentials: true`,
    `allowHeaders: ["Content-Type", "Authorization"]`, methods
-   GET/POST/PUT/DELETE/OPTIONS (`index.ts:128`).
+   GET/POST/PUT/DELETE/OPTIONS (`app/app.ts`).
 2. **Request logger** — logs method, URL, status and duration through Pino
    (`middleware/request-logger.middleware.ts`).
 3. **Global error handler** — registered with `app.onError(errorHandler)`.
@@ -197,9 +200,9 @@ orchestration.
    Hono middleware cannot inject them into a Response returned by Better Auth.
 6. **API-key middleware** — only `/send-email/*`; verifies the key and loads
    the caller's user + SMTP configuration.
-7. **Lazy dependency initialization** — on the first request, builds the
-   Drizzle DB and every repository/service singleton (`deps` object,
-   `index.ts:81`).
+7. **Lazy dependency initialization** — on the first request, opens the
+   `Database` through the container's adapter factory and builds every
+   repository/service singleton (`deps` object, `app/container.ts`).
 8. **Route controllers** — mounted in this order: `/send-email`,
    `/smtp-config`, `/api-keys`, `/email-logs`, `/dashboard`, `/templates`.
    Dashboard routes are wrapped in `sessionMiddleware`.
@@ -212,17 +215,22 @@ reaches a controller.
 
 ### 5.2 Dependency injection
 
-There is no IoC container. `deps` is a module-level object holding nullable
-repositories/services and two idempotent initializers:
+There is no IoC container. The runtime entry point calls
+`createContainer({ database? })` and passes the result to `createApp`. The
+container holds nullable repositories/services and two idempotent initializers:
 
-- `initDb(env)` — `createDatabase(env.makisend_db)`, constructs repositories,
-  caches `env.AES_256_KEY`, sets `dbInitialized`.
+- `getDatabase(env)` — opens the `Database` once per bindings object through
+  the injected factory (Cloudflare D1 by default) and returns the same instance
+  to the repositories and to `createAuth(env, db)`.
+- `initDb(env, requestUrl)` — constructs every repository with that database,
+  caches the encryption keys and the optional Cloudflare Email binding, sets
+  `dbInitialized`.
 - `initServices()` — constructs services with repositories + AES key.
 
 Controllers receive **getter functions** (`() => deps.emailRepository!`) so
 they resolve the singleton at request time, not at module load. The auth
 instance is cached separately and recreated when `BETTER_AUTH_URL` or
-`FRONTEND_URL` changes (`getAuthInstance`, `index.ts:67`).
+`FRONTEND_URL` changes (`getAuthInstance`, `app/container.ts`).
 
 This is request-safe in Workers because module state is per-isolate, but it
 means a change to `AES_256_KEY` or the DB binding without a redeploy will not
@@ -239,7 +247,10 @@ MakiSend has two independent auth planes.
 
 `src/backend/src/lib/auth.ts` configures Better Auth with:
 
-- Drizzle adapter (`provider: "sqlite"`, `transaction: false`).
+- Drizzle adapter (`provider: "sqlite"`, `transaction: false`) over the
+  container's shared `Database` (`createAuth(env, db)`); Better Auth never
+  opens its own client, so the same auth code runs on D1, better-sqlite3 or
+  libSQL.
 - Email/password enabled.
 - `changeEmail.updateEmailWithoutVerification: true` (no verification flow is
   configured, so the settings page can change the email immediately).
@@ -251,14 +262,17 @@ MakiSend has two independent auth planes.
 - Cookie defaults `SameSite=None; Secure` (Workers and Pages are different
   sites in a split deployment; the current same-origin deployment still uses
   this).
-- API-key plugin: prefix `mk_`, rate limit 10,000 requests/day per key.
+- API-key plugin: prefix `mk_`, per-key quota disabled
+  (`apiKeyOptions.rateLimit.enabled = false`); the optional instance-wide quota
+  comes from `SEND_RATE_LIMIT` and runs before idempotency.
 
-Sign-up is **closed after the first user**. The special route at
-`index.ts:158` counts rows in `user`; if any exists it returns
-`403 {"error":"Registration is closed"}`. Otherwise it injects a `name` (the
-local part of the email) because Better Auth requires one while the product UI
-only asks for email + password, then forwards the request to
-`auth.handler()`.
+Sign-up is **closed after the first account**. Every creation path goes through
+`databaseHooks.user.create.before`, which claims the single `instance_owner`
+row with one conditional UPSERT (`src/lib/owner-lock.ts`); a second sign-up
+gets `403` with `SETUP_COMPLETE`. The `/api/auth/sign-up/email` route only
+injects a `name` (the local part of the email) because Better Auth requires
+one while the product UI asks for email + password, then forwards the request
+to `auth.handler()`.
 
 `sessionMiddleware` calls `auth.api.getSession({ headers })`, rejects with
 `401 Unauthorized` when there is no session, and sets `c.get("userId")`.

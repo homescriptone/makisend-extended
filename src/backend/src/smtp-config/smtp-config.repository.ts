@@ -1,5 +1,5 @@
 import { smtpConfig } from "@/db/schema";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import type { ISmtpConfigRepository, SmtpConfigInput, SmtpConfigUpdateInput, SmtpConfigRecord } from "./smtp-config.types";
 import { eq } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";

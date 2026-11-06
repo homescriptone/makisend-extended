@@ -3,10 +3,10 @@ import { APIError } from "better-auth/api";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { apiKey } from "@better-auth/api-key";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
 import * as schema from "@/db/schema";
 import type { Bindings } from "@/app/env";
+import type { Database } from "@/db/client";
 import { claimOwnership, releaseOwnership, SETUP_COMPLETE_MESSAGE } from "@/lib/owner-lock";
 import { totpSignIn } from "@/lib/totp-sign-in";
 
@@ -24,9 +24,16 @@ export const apiKeyOptions = {
   rateLimit: { enabled: false },
 };
 
-export function createAuth(env: Bindings) {
-  const db = drizzle(env.makisend_db);
+/**
+ * Bindings Better Auth reads. The database is passed separately (the shared
+ * `Database` port), so auth can run on D1 or on a plain SQLite file.
+ */
+export type AuthEnv = Pick<
+  Bindings,
+  "BETTER_AUTH_SECRET" | "BETTER_AUTH_URL" | "FRONTEND_URL" | "RATE_LIMIT"
+>;
 
+export function createAuth(env: AuthEnv, db: Database) {
   return betterAuth({
     database: drizzleAdapter(db, {
       provider: "sqlite",
@@ -58,7 +65,7 @@ export function createAuth(env: Bindings) {
         },
         // The instance is set up again at the next connection (src/lib/owner-lock.ts).
         afterDelete: async () => {
-          await releaseOwnership(env.makisend_db);
+          await releaseOwnership(db);
         },
       },
     },
@@ -68,7 +75,7 @@ export function createAuth(env: Bindings) {
       user: {
         create: {
           before: async () => {
-            if (!(await claimOwnership(env.makisend_db))) {
+            if (!(await claimOwnership(db))) {
               throw APIError.from("FORBIDDEN", { message: SETUP_COMPLETE_MESSAGE, code: "SETUP_COMPLETE" });
             }
           },

@@ -2,7 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { pinoLogger } from "@/core/logger";
 import type { Config } from "@/config/config";
 import { AppError } from "@/core/errors";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { user, apikey, smtpConfig } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { decrypt } from "@/core/crypto";
@@ -39,7 +39,7 @@ export function apiKeyMiddleware(config: Config, auth: any) {
     // referenceId = the user ID who owns this API key
     const userId = result.key.referenceId;
 
-    const db = createDatabase(config.db);
+    const db = createDatabase({ provider: "d1", binding: config.db });
 
     // Verify user exists
     const userResult = await db

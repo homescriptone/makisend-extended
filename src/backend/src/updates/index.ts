@@ -1,5 +1,5 @@
 import { pinoLogger } from "@/core/logger";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import type { Bindings } from "@/app/env";
 import { GitHubReleaseSource } from "./github-release.source";
 import { resolveUpdateSettings } from "./updates.config";
@@ -17,7 +17,7 @@ export type * from "./updates.types";
 export function createUpdateService(env: Bindings): UpdateService {
   const settings = resolveUpdateSettings(env);
   return new UpdateService(
-    new UpdateCheckRepository(createDatabase(env.makisend_db)),
+    new UpdateCheckRepository(createDatabase({ provider: "d1", binding: env.makisend_db })),
     new GitHubReleaseSource(settings.upstreamRepository),
     settings,
   );

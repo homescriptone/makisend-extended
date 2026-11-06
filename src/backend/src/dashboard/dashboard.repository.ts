@@ -1,5 +1,5 @@
 import { emailLogs, emailHistories, apikey, smtpConfig } from "@/db/schema";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import type { IDashboardRepository, DashboardStats, SmtpConfigBreakdown, ApiKeyMetrics, RecentEmail, ErrorSummary } from "./dashboard.types";
 import { eq, and, desc, sql, gte, type SQL } from "drizzle-orm";
 

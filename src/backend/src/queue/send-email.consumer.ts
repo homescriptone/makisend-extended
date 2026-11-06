@@ -1,5 +1,5 @@
 import { pinoLogger } from "@/core/logger";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { SendEmailRepository } from "@/send-email/send-email.repository";
 import type { Bindings } from "@/app/env";
 import type { SendEmailQueueMessage } from "@/send-email/send-email.types";
@@ -39,7 +39,7 @@ export async function sendEmailQueueConsumer(
   batch: MessageBatch<SendEmailQueueMessage>,
   env: Bindings,
 ): Promise<void> {
-  const repository = new SendEmailRepository(createDatabase(env.makisend_db));
+  const repository = new SendEmailRepository(createDatabase({ provider: "d1", binding: env.makisend_db }));
 
   for (const msg of batch.messages) {
     const emailId = msg.body?.emailId;

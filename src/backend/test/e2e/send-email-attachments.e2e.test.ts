@@ -39,7 +39,7 @@ import { SendEmailWorkflow } from "@/workflows";
 import type { SendEmailParams, SendEmailRunOutcome } from "@/workflows/send-email.workflow";
 import { runKeyRotation } from "@/key-rotation";
 import { encrypt, keyId } from "@/core/crypto";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { emailAttachments, emailHistories, smtpConfig } from "@/db/schema";
 import type { SendEmailQueueMessage } from "@/send-email/send-email.types";
 import { createTestD1, cleanupTestD1 } from "../helpers/d1-setup";
@@ -315,7 +315,7 @@ describe("e2e — POST /send-email with attachments, through the deployed Worker
     smtpConfigId = ((await created.json()) as { config: { id: string } }).config.id;
 
     // ...pointed at the local server. The API refuses loopback hosts and random ports.
-    await createDatabase(d1)
+    await createDatabase({ provider: "d1", binding: d1 })
       .update(smtpConfig)
       .set({ smtpHostname: await encrypt("localhost", OLD_KEY), smtpPort: smtp.port, smtpSecurity: "starttls" })
       .where(eq(smtpConfig.id, smtpConfigId));
@@ -358,7 +358,7 @@ describe("e2e — POST /send-email with attachments, through the deployed Worker
     expect(((await retry.json()) as { emailId: string }).emailId).toBe(emailId);
 
     expect(queue.messages).toEqual([{ emailId }]);
-    const stored = await createDatabase(d1).select().from(emailAttachments).where(eq(emailAttachments.emailId, emailId));
+    const stored = await createDatabase({ provider: "d1", binding: d1 }).select().from(emailAttachments).where(eq(emailAttachments.emailId, emailId));
     expect(stored.map((r) => [r.position, r.filename, r.contentType])).toEqual([
       [0, "reçu REC-1.pdf", "application/pdf"],
       [1, "détail.csv", "application/octet-stream"],
@@ -440,7 +440,7 @@ describe("e2e — POST /send-email with attachments, through the deployed Worker
     await runKeyRotation(env);
 
     const newKid = await keyId(NEW_KEY);
-    const [row] = await createDatabase(d1).select().from(emailAttachments).where(eq(emailAttachments.emailId, emailId));
+    const [row] = await createDatabase({ provider: "d1", binding: d1 }).select().from(emailAttachments).where(eq(emailAttachments.emailId, emailId));
     expect((JSON.parse(row.content) as { kid: string }).kid).toBe(newKid);
 
     // The old key is gone from the Worker: only the new one can read the file now.
@@ -456,7 +456,7 @@ describe("e2e — POST /send-email with attachments, through the deployed Worker
       ["recu.pdf", "application/pdf", sha256(PDF)],
     ]);
 
-    const statuses = await createDatabase(d1)
+    const statuses = await createDatabase({ provider: "d1", binding: d1 })
       .select({ status: emailHistories.status })
       .from(emailHistories)
       .where(eq(emailHistories.emailId, emailId));

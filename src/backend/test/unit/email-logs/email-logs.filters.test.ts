@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { sql } from "drizzle-orm";
 import type { Miniflare } from "miniflare";
 import { createTestD1, cleanupTestD1 } from "../../helpers/d1-setup";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import { EmailLogRepository } from "@/email-logs/email-logs.repository";
 import type { EmailLogFilters } from "@/email-logs/email-logs.types";
 

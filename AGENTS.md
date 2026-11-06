@@ -17,7 +17,7 @@ The product aims to provide a simple API for sending transactional emails withou
 - **Runtime**: Cloudflare Workers (`workerd`)
 - **Web framework**: Hono
 - **Validation**: Zod + `@hono/zod-validator`
-- **ORM / Database**: Drizzle ORM + Cloudflare D1 (SQLite)
+- **ORM / Database**: Drizzle ORM + Cloudflare D1 (SQLite), behind a `Database` port with SQLite/libSQL adapters
 - **Email delivery**: nodemailer via raw SMTP
 - **Business logic**: Repository / Service / Controller
 - **Logging**: Pino (configured for edge environment, no Node.js transport)
@@ -52,7 +52,10 @@ src/
 ├── dashboard/                  # Delivery metrics / stats endpoints
 ├── db/
 │   ├── schema.ts               # Drizzle schema (users, apikeys, smtp_config, email_logs, ...)
-│   └── connection.ts           # drizzle(db) factory
+│   ├── client.ts               # Database port: shared type + affectedRows()
+│   ├── d1.ts                   # Cloudflare D1 adapter (the one the Worker imports)
+│   ├── sqlite.ts               # better-sqlite3 adapter (Node runtime, tests)
+│   └── turso.ts                # libSQL/Turso adapter
 ├── email-logs/                 # Email log listing with filters
 ├── lib/
 │   └── auth.ts                 # Better Auth setup (API keys)
@@ -169,7 +172,7 @@ Even though the runtime remains **Hono** (not NestJS), the code organization is 
 - **Modules**: each business domain (e.g. `send-email`) is a cohesive module exporting its controllers, services, repositories and DTOs via an `index.ts` barrel file.
 - **Controllers**: `*.controller.ts` files contain only HTTP code — routing, input validation (DTO), and response formatting.
 - **Providers / Services**: business logic lives in services. They know nothing about the web framework.
-- **Repositories**: persistence is isolated behind an interface / contract (`IEmailRepository`). The concrete repository can be implemented with Drizzle/D1 today and replaced later without touching the service.
+- **Repositories**: persistence is isolated behind an interface / contract (`IEmailRepository`). The concrete repository is implemented with Drizzle today and can be replaced later without touching the service.
 - **DTOs / Schemas**: Zod validation schemas are extracted into `*.dto.ts` files next to the controller. They serve both as API contracts and TypeScript types (`z.infer`).
 - **Manual dependency injection**: Hono has no native IoC container. Dependencies are injected through constructors (`new Service(new Repository(...), config)`), or via controller factories that take lazy getters (`createSendEmailController(() => deps.emailRepository!, ...)`), wired in `src/backend/src/app/container.ts` and `src/backend/src/app/app.ts`.
 - **Shared kernel**: cross-cutting code (logger, errors, encryption, configuration) lives in `src/core/` and depends on no business module.
@@ -214,6 +217,7 @@ Even though the runtime remains **Hono** (not NestJS), the code organization is 
 
 - The rule is enforced on account creation itself (`databaseHooks.user.create.before` in `src/lib/auth.ts`), not on the sign-up route: any Better Auth endpoint or server-side call that creates a user goes through it. `core/create-user.ts` (direct insert) claims the instance the same way.
 - It is atomic: each creation claims the single row of `instance_owner` with one conditional UPSERT (`src/lib/owner-lock.ts`), so concurrent first sign-ups create exactly one account (the previous count-then-insert check let a race create two). A claim whose account was never created is freed after 30 s while no user exists. An instance that already has an account stays locked after the migration: the claim requires an empty `user` table.
+- Better Auth shares the container's `Database` (`createAuth(env, db)`) instead of opening its own D1 client, so the same auth code runs on D1 and on the Node runtime's SQLite adapter.
 - Deleting the account (Settings > Delete Account) releases the instance: the next connection sets it up again. There is no password reset by email.
 
 **Two-factor authentication (TOTP).** Settings > Two-factor authentication turns on TOTP with any authenticator app (Google Authenticator, 1Password, Authy...): the password is asked, a QR code and a manual key are shown with 10 backup codes, and 2FA only turns on once a first code is accepted. Sign-in then asks for the code after the password (`twoFactorRedirect`), with a backup code as fallback and an optional 30-day trusted device. Better Auth's `twoFactor` plugin: 3 attempts per 10 s per IP on `/two-factor/*`, 5 attempts per challenge, account locked 15 min after 10 failures.
@@ -277,6 +281,7 @@ Tests: `test/unit/auth/auth-routes.test.ts` (single account, races, 2FA, passwor
   - API key middleware (401/403 + context wiring, inactive SMTP config refusal)
   - SMTP host/port validation, transport options, error classification
   - SMTP check/test-send endpoints and per-config transport resolution
+  - Database port: the same migrations and repositories on better-sqlite3 and libSQL, including Better Auth and the owner lock (`test/integration/sqlite.test.ts`)
 - Mocks are reset in `beforeEach`
 - Run `pnpm test:run` before committing
 
@@ -286,6 +291,8 @@ Tests: `test/unit/auth/auth-routes.test.ts` (single account, races, 2FA, passwor
 - ORM: **Drizzle**
 - Schema: `src/db/schema.ts`
 - Config: `drizzle.config.ts`
+- **Database port**: `src/db/client.ts` defines the `Database` type every repository depends on. `db/d1.ts` is the Cloudflare adapter; `db/sqlite.ts` (better-sqlite3) and `db/turso.ts` (libSQL) serve the Node runtime and tests. Only the D1 adapter is reachable from the Worker entry point, so the native SQLite driver never enters the Workers bundle.
+- **Shared connection**: `createContainer` opens one `Database` and passes it to both the repositories and `createAuth`; Better Auth no longer creates a second Drizzle client.
 - Migrations: managed in the `drizzle/` folder
 - Wrangler binding: `makisend_db`
 - Email bodies live in `email_contents` (encrypted, keyed by `email_logs.internalId`); attachments live in `email_attachments`, one encrypted row per file (base64 then AES-GCM), never in the queue; templates store visual-builder JSON (theme + TipTap content) or pasted TSX source alongside exported HTML/text;

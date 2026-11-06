@@ -1,5 +1,5 @@
 import { apikey, smtpConfig } from "@/db/schema";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import type { IApiKeyRepository, ApiKeyCreateInput, ApiKeyRecord, ApiKeyCreatedResult } from "./api-keys.types";
 import { eq, and, desc } from "drizzle-orm";
 

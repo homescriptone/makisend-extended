@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { sql } from "drizzle-orm";
 import { createTestD1, cleanupTestD1 } from "../../helpers/d1-setup";
 import type { Miniflare } from "miniflare";
-import type { Database } from "@/db/connection";
+import type { Database } from "@/db/client";
 import { DashboardRepository } from "@/dashboard/dashboard.repository";
 
 // Runs the rewritten dashboard queries against a real workerd D1 database so

@@ -2,7 +2,7 @@ import { user, smtpConfig, apikey } from '@/db/schema';
 import { createId } from "@paralleldrive/cuid2";
 import { getPlatformProxy } from "wrangler";
 import type { Bindings } from "@/app/env";
-import { createDatabase } from "@/db/connection";
+import { createDatabase } from "@/db/d1";
 import { createConfig } from '@/config/config';
 import { createAuth } from '@/lib/auth';
 import * as readline from 'node:readline/promises';
@@ -38,12 +38,12 @@ async function main() {
     rl.close();
 
     const config = createConfig(env);
-    const db = createDatabase(config.db);
+    const db = createDatabase({ provider: "d1", binding: config.db });
     const aesKey = config.aesKey;
 
     // Same single-account rule as the dashboard (src/lib/owner-lock.ts): this script inserts the
     // user row directly, so it must claim the instance itself.
-    if (!(await claimOwnership(config.db))) {
+    if (!(await claimOwnership(db))) {
       throw new Error(SETUP_COMPLETE_MESSAGE);
     }
 
@@ -82,7 +82,7 @@ async function main() {
     });
 
     // Create API Key via Better Auth (linked to SMTP config)
-    const auth = createAuth(env);
+    const auth = createAuth(env, db);
     const result = await auth.api.createApiKey({
       body: {
         userId: userId,
