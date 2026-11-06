@@ -1,19 +1,11 @@
 import { AppError, EncryptionKeyError } from "@/core/errors";
 import { isValidKeyHex, type EncryptionKeys } from "@/core/crypto";
-import type { Bindings } from "@/index";
+import type { Bindings, SmtpConfig, UserConfig } from "@/app/env";
 
-export interface SmtpConfig {
-  smtpHostName: string;
-  /** Optional only for rows read before the port/security columns existed. */
-  smtpPort?: number;
-  smtpSecurity?: "tls" | "starttls";
-  senderEmail: string;
-  smtpUsername: string;
-  smtpPassword: string;
-}
-export interface UserConfig {
-  userId: string;
-}
+// The request-scoped shapes live with the bindings (src/app/env.ts); re-exported
+// here because every consumer already imports them from the config module.
+export type { SmtpConfig, UserConfig };
+
 export interface Config {
   aesKey: EncryptionKeys;
   db: D1Database;

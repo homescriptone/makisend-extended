@@ -1,0 +1,116 @@
+import { resolveEncryptionKeys } from "@/config/config";
+import { createDatabase } from "@/db/connection";
+import { createAuth } from "@/lib/auth";
+import { SendEmailRepository } from "@/send-email/send-email.repository";
+import { SmtpConfigRepository, SmtpConfigService } from "@/smtp-config";
+import { ApiKeyRepository, ApiKeyService } from "@/api-keys";
+import { EmailLogRepository, EmailLogService } from "@/email-logs";
+import { DashboardRepository, DashboardService } from "@/dashboard";
+import { TemplateRepository, TemplateService } from "@/templates";
+import { IdempotencyRepository, IdempotencyService } from "@/idempotency";
+import {
+  parseSendRateLimit,
+  SendRateLimitRepository,
+  type ISendRateLimitRepository,
+  type SendRateLimit,
+} from "@/send-rate-limit";
+import { createUpdateService, type UpdateService } from "@/updates";
+import { withPublicUrls, type Bindings } from "./env";
+
+import type { EncryptionKeys } from "@/core/crypto";
+import type { IEmailRepository } from "@/send-email/send-email.types";
+import type { ISmtpConfigRepository } from "@/smtp-config/smtp-config.types";
+import type { IApiKeyRepository } from "@/api-keys/api-keys.types";
+import type { IEmailLogRepository } from "@/email-logs/email-logs.types";
+import type { IDashboardRepository } from "@/dashboard/dashboard.types";
+import type { ITemplateRepository } from "@/templates/templates.types";
+import type { IIdempotencyRepository } from "@/idempotency";
+
+/**
+ * Lazily initialized dependency container.
+ *
+ * Created once per runtime entry point (src/runtime/cloudflare/entry.ts today,
+ * src/runtime/node/server.ts later). Nothing runtime-specific lives here: the
+ * container only needs the bindings' database handle, encryption keys and the
+ * optional Cloudflare Email Service binding.
+ */
+export function createContainer() {
+  // Auth instance: recreate if baseURL or frontend URL changes (e.g. first request
+  // before secrets are set).
+  let authInstance: ReturnType<typeof createAuth> | null = null;
+  let authBaseUrl: string | null = null;
+  let authFrontendUrl: string | null = null;
+
+  function getAuthInstance(rawEnv: Bindings, requestUrl?: string) {
+    const env = withPublicUrls(rawEnv, requestUrl);
+    if (
+      !authInstance ||
+      env.BETTER_AUTH_URL !== authBaseUrl ||
+      env.FRONTEND_URL !== authFrontendUrl
+    ) {
+      authInstance = createAuth(env);
+      authBaseUrl = env.BETTER_AUTH_URL ?? null;
+      authFrontendUrl = env.FRONTEND_URL ?? null;
+    }
+    return authInstance;
+  }
+
+  const deps = {
+    emailRepository: null as IEmailRepository | null,
+    smtpConfigRepository: null as ISmtpConfigRepository | null,
+    apiKeyRepository: null as IApiKeyRepository | null,
+    emailLogRepository: null as IEmailLogRepository | null,
+    dashboardRepository: null as IDashboardRepository | null,
+    templateRepository: null as ITemplateRepository | null,
+    idempotencyRepository: null as IIdempotencyRepository | null,
+    sendRateLimitRepository: null as ISendRateLimitRepository | null,
+    sendRateLimit: null as SendRateLimit | null,
+    smtpConfigService: null as SmtpConfigService | null,
+    apiKeyService: null as ApiKeyService | null,
+    emailLogService: null as EmailLogService | null,
+    dashboardService: null as DashboardService | null,
+    templateService: null as TemplateService | null,
+    idempotencyService: null as IdempotencyService | null,
+    updateService: null as UpdateService | null,
+    aesKey: null as EncryptionKeys | null,
+    emailBinding: undefined as SendEmail | undefined,
+    dbInitialized: false,
+
+    initDb(env: Bindings, requestUrl: string) {
+      if (this.dbInitialized) return;
+
+      const db = createDatabase(env.makisend_db);
+      const auth = getAuthInstance(env, requestUrl);
+      this.emailRepository = new SendEmailRepository(db);
+      this.smtpConfigRepository = new SmtpConfigRepository(db);
+      this.apiKeyRepository = new ApiKeyRepository(db, auth);
+      this.emailLogRepository = new EmailLogRepository(db);
+      this.dashboardRepository = new DashboardRepository(db);
+      this.templateRepository = new TemplateRepository(db);
+      this.idempotencyRepository = new IdempotencyRepository(db);
+      this.sendRateLimitRepository = new SendRateLimitRepository(db);
+      this.sendRateLimit = parseSendRateLimit(env.SEND_RATE_LIMIT);
+      this.aesKey = resolveEncryptionKeys(env);
+      this.emailBinding = env.EMAIL;
+      this.updateService = createUpdateService(env);
+      this.dbInitialized = true;
+    },
+
+    initServices() {
+      if (this.smtpConfigService) return;
+      this.smtpConfigService = new SmtpConfigService(this.smtpConfigRepository!, this.aesKey!, {
+        emailBinding: this.emailBinding,
+        emailLogs: this.emailRepository!,
+      });
+      this.apiKeyService = new ApiKeyService(this.apiKeyRepository!);
+      this.emailLogService = new EmailLogService(this.emailLogRepository!, this.aesKey!);
+      this.dashboardService = new DashboardService(this.dashboardRepository!, this.aesKey!);
+      this.templateService = new TemplateService(this.templateRepository!);
+      this.idempotencyService = new IdempotencyService(this.idempotencyRepository!);
+    },
+  };
+
+  return { deps, getAuthInstance };
+}
+
+export type Container = ReturnType<typeof createContainer>;

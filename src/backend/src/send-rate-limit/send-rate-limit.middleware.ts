@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { pinoLogger } from "@/core/logger";
-import type { Bindings, UserInfoVariables } from "@/index";
+import type { Bindings, UserInfoVariables } from "@/app/env";
 import type { ISendRateLimitRepository, SendRateLimit } from "./send-rate-limit.types";
 
 /**

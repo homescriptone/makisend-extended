@@ -1,7 +1,7 @@
 import { pinoLogger } from "@/core/logger";
 import { createDatabase } from "@/db/connection";
 import { SendEmailRepository } from "@/send-email/send-email.repository";
-import type { Bindings } from "@/index";
+import type { Bindings } from "@/app/env";
 import type { SendEmailQueueMessage } from "@/send-email/send-email.types";
 
 // Backoff schedule for *consumer-level* retries (when `create()` itself throws,

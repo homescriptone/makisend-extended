@@ -1,6 +1,6 @@
 import { resolveEncryptionKeys } from "@/config/config";
 import { pinoLogger } from "@/core/logger";
-import type { Bindings } from "@/index";
+import type { Bindings } from "@/app/env";
 import { ENCRYPTED_COLUMNS, KeyRotationRepository } from "./key-rotation.repository";
 import { KeyRotationService } from "./key-rotation.service";
 

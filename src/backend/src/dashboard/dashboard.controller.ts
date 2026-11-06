@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { pinoLogger } from "@/core/logger";
-import type { Bindings, UserInfoVariables } from "@/index";
+import type { Bindings, UserInfoVariables } from "@/app/env";
 import { DashboardQueryDto, StatsQueryDto, RecentQueryDto, ErrorsQueryDto } from "./dashboard.dto";
 import type { DashboardService } from "./dashboard.service";
 

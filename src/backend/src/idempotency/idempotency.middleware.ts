@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { AppError } from "@/core/errors";
 import { pinoLogger } from "@/core/logger";
-import type { Bindings, UserInfoVariables } from "@/index";
+import type { Bindings, UserInfoVariables } from "@/app/env";
 import type { IdempotencyService } from "./idempotency.service";
 
 const MAX_IDEMPOTENCY_KEY_LENGTH = 255;

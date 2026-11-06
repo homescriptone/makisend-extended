@@ -6,7 +6,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
 import * as schema from "@/db/schema";
-import type { Bindings } from "@/index";
+import type { Bindings } from "@/app/env";
 import { claimOwnership, releaseOwnership, SETUP_COMPLETE_MESSAGE } from "@/lib/owner-lock";
 import { totpSignIn } from "@/lib/totp-sign-in";
 

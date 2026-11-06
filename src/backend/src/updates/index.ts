@@ -1,6 +1,6 @@
 import { pinoLogger } from "@/core/logger";
 import { createDatabase } from "@/db/connection";
-import type { Bindings } from "@/index";
+import type { Bindings } from "@/app/env";
 import { GitHubReleaseSource } from "./github-release.source";
 import { resolveUpdateSettings } from "./updates.config";
 import { UpdateCheckRepository } from "./updates.repository";

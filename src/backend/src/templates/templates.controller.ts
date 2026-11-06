@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { pinoLogger } from "@/core/logger";
 import { MAX_ID_LENGTH } from "@/core/validation";
-import type { Bindings, UserInfoVariables } from "@/index";
+import type { Bindings, UserInfoVariables } from "@/app/env";
 import { CreateTemplateDto, PreviewTemplateDto, UpdateTemplateDto } from "./templates.dto";
 import type { TemplateService } from "./templates.service";
 

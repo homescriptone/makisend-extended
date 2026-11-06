@@ -12,7 +12,7 @@ import {
   SEND_RETRY_DELAY_SECONDS,
 } from "./send-email.flow";
 import type { SendEmailFlowOutcome } from "./send-email.flow";
-import type { Bindings } from "@/index";
+import type { Bindings } from "@/app/env";
 import type { SendEmailQueueMessage } from "@/send-email/send-email.types";
 
 /** Workflow instance payload: only the id, matching the queue message. */

@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { pinoLogger } from "@/core/logger";
 import { MAX_ID_LENGTH } from "@/core/validation";
-import type { Bindings, UserInfoVariables } from "@/index";
+import type { Bindings, UserInfoVariables } from "@/app/env";
 import { CreateSmtpConfigDto, TestSendDto, UpdateSmtpConfigDto } from "./smtp-config.dto";
 import { toPublicSmtpConfig } from "./smtp-config.types";
 import type { SmtpConfigService } from "./smtp-config.service";

@@ -2,7 +2,7 @@ import { resolveEncryptionKeys } from "@/config/config";
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import type { Bindings, UserInfoVariables } from "@/index";
+import type { Bindings, UserInfoVariables } from "@/app/env";
 import { SendEmailPayloadDto } from "./send-email.dto";
 import { DEFAULT_ATTACHMENT_CONTENT_TYPE } from "./attachments";
 import type { SendEmailDto, SendTemplateEmailDto } from "./send-email.dto";

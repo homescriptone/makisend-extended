@@ -32,7 +32,14 @@ The project follows a **NestJS-inspired modular architecture**. The backend pack
 
 ```
 src/
-├── index.ts                    # Hono entrypoint, bindings, route wiring, DI
+├── index.ts                    # Cloudflare entry re-export (runtime/cloudflare/entry.ts)
+├── app/
+│   ├── env.ts                  # Bindings + request-scoped types, withPublicUrls
+│   ├── container.ts            # lazy DI container and auth instance cache
+│   └── app.ts                  # createApp(container): middleware + routes
+├── runtime/
+│   └── cloudflare/
+│       └── entry.ts            # fetch / queue / scheduled + SendEmailWorkflow export
 ├── api-keys/                   # Per-user API key module (Better Auth)
 ├── config/
 │   └── config.ts               # Typed Config object built from Bindings
@@ -106,7 +113,8 @@ test/
 ## Essential commands
 
 Run backend commands from `src/backend/` (or prefix them with
-`pnpm --filter ./src/backend`).
+`pnpm --filter ./src/backend`). The root `Makefile` wraps the same scripts:
+`make help` lists every target (`make setup`, `make dev`, `make test`, `make lint`...).
 
 ```bash
 # Install dependencies (repository root)
@@ -163,7 +171,7 @@ Even though the runtime remains **Hono** (not NestJS), the code organization is 
 - **Providers / Services**: business logic lives in services. They know nothing about the web framework.
 - **Repositories**: persistence is isolated behind an interface / contract (`IEmailRepository`). The concrete repository can be implemented with Drizzle/D1 today and replaced later without touching the service.
 - **DTOs / Schemas**: Zod validation schemas are extracted into `*.dto.ts` files next to the controller. They serve both as API contracts and TypeScript types (`z.infer`).
-- **Manual dependency injection**: Hono has no native IoC container. Dependencies are injected through constructors (`new Service(new Repository(...), config)`), or via controller factories that take lazy getters (`createSendEmailController(() => deps.emailRepository!, ...)`), wired in `src/backend/src/index.ts`.
+- **Manual dependency injection**: Hono has no native IoC container. Dependencies are injected through constructors (`new Service(new Repository(...), config)`), or via controller factories that take lazy getters (`createSendEmailController(() => deps.emailRepository!, ...)`), wired in `src/backend/src/app/container.ts` and `src/backend/src/app/app.ts`.
 - **Shared kernel**: cross-cutting code (logger, errors, encryption, configuration) lives in `src/core/` and depends on no business module.
 
 ### Anti-patterns to avoid

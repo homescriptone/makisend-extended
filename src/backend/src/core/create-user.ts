@@ -1,7 +1,7 @@
 import { user, smtpConfig, apikey } from '@/db/schema';
 import { createId } from "@paralleldrive/cuid2";
 import { getPlatformProxy } from "wrangler";
-import type { Bindings } from "@/index";
+import type { Bindings } from "@/app/env";
 import { createDatabase } from "@/db/connection";
 import { createConfig } from '@/config/config';
 import { createAuth } from '@/lib/auth';

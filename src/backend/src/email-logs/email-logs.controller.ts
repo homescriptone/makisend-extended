@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { pinoLogger } from "@/core/logger";
-import type { Bindings, UserInfoVariables } from "@/index";
+import type { Bindings, UserInfoVariables } from "@/app/env";
 import type { EmailLogService } from "./email-logs.service";
 import type { EmailLogPageFilters } from "./email-logs.types";
 import { MAX_PAGE_SIZE } from "./email-logs.repository";

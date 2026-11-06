@@ -140,6 +140,8 @@ pnpm --filter ./src/backend dev            # API on http://localhost:8787
 pnpm --filter ./src/frontend dev           # dashboard on http://localhost:4321
 ```
 
+Or through the root `Makefile` (a thin wrapper around the same scripts): `make setup`, `make dev`, `make dev-ui`; `make help` lists every target.
+
 The first connection to the dashboard creates the administrator account. Then create an SMTP configuration and an API key linked to it.
 
 Backend commands, run from `src/backend/`: `pnpm test` (watch), `pnpm test:run`, `pnpm test:ui`, `pnpm test:coverage`, `pnpm lint`, `pnpm lint:fix`, `pnpm cf-typegen`. Migrations, end-to-end tests and debugging are in [`docs/DEVELOPER_GUIDE.md`](./docs/DEVELOPER_GUIDE.md).

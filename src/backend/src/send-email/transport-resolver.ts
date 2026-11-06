@@ -10,7 +10,7 @@ import { isCloudflareEmailHost } from "@/smtp-config/smtp-host";
 import type { SmtpConfig } from "@/config/config";
 import { resolveEncryptionKeys } from "@/config/config";
 import type { IEmailTransport } from "./send-email.types";
-import type { Bindings } from "@/index";
+import type { Bindings } from "@/app/env";
 
 type SmtpConfigRow = typeof smtpConfigTable.$inferSelect;
 

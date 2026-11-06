@@ -345,7 +345,7 @@ The current `src/index.ts` keeps working during the migration: it becomes a thin
 | Slice | Scope | Exit criterion | Status |
 |---|---|---|---|
 | S0 | Repair the `src/` restructure | install, lint, typecheck, tests, build and both `wrangler deploy --dry-run` pass | done (6 Nov 2026) |
-| S1 | Extract `app/env.ts`, `app/container.ts`, `app/app.ts`; `src/index.ts` becomes `runtime/cloudflare/entry.ts` re-exported from the old path | no behavior change, tests unchanged | next |
+| S1 | Extract `app/env.ts`, `app/container.ts`, `app/app.ts`; `src/index.ts` becomes `runtime/cloudflare/entry.ts` re-exported from the old path | no behavior change, tests unchanged | done (6 Nov 2026) |
 | S2 | Database port: `createDatabase({ provider: "d1" \| "sqlite" \| "turso" })`; Better Auth receives the shared `Database` instance | D1 tests pass; new SQLite integration test applies the same migrations | planned |
 | S3 | Job queue port: `JobQueue.enqueue(emailId)` injected into the send-email controller; Cloudflare and local adapters | controller no longer reads `c.env`; queue tests cover both adapters | planned |
 | S4 | Workflow port: `SendEmailFlow` runs steps through a `StepRunner`; Cloudflare adapter wraps `WorkflowStep`, local adapter executes with the same retry budget | workflow tests run against both runners | planned |
@@ -363,6 +363,14 @@ Documentation updates (README, AGENTS.md, CONTRIBUTING.md, `docs/*.md`) follow e
 - Preserve current Cloudflare behavior.
 - Add tests around the new boundaries.
 - Introduce the initial Makefile and `make help`.
+
+**Done in this phase (6 Nov 2026):** the composition root is extracted
+(`src/backend/src/app/{env,container,app}.ts`) and `src/index.ts` now only
+re-exports the Cloudflare runtime entry (`src/backend/src/runtime/cloudflare/entry.ts`).
+The initial root `Makefile` exists: `make help` lists every target (`install`,
+`setup`, `dev`, `build`, `test`, `lint`, `typecheck`, `migrate`, `db-reset`,
+Docker targets, `deploy`); `start` and `worker` fail with a clear "planned, S6"
+message until the standalone runtime lands.
 
 **Exit criteria:** Existing Cloudflare deployment and behavior continue to work, while infrastructure-specific dependencies are isolated behind explicit boundaries.
 
@@ -466,7 +474,10 @@ Only introduce these when there is a clear use case. Keep optional modules separ
 
 ## 5. Makefile command expectations
 
-The final Makefile must reflect the repository's real package scripts and deployment tools. The following is a target contract, not a copy-paste implementation:
+Implemented at the repository root as a thin wrapper around the existing package
+scripts; `make help` lists the current targets. `start` and `worker` are explicit
+stubs until the standalone runtime (slice S6) exists. The table below remains the
+contract for the final command surface.
 
 | Target | Expected responsibility |
 |---|---|

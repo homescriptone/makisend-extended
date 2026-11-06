@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { pinoLogger } from "@/core/logger";
-import type { Bindings, UserInfoVariables } from "@/index";
+import type { Bindings, UserInfoVariables } from "@/app/env";
 import { UpdateStatusQueryDto } from "./updates.dto";
 import type { UpdateService } from "./updates.service";
 
