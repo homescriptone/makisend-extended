@@ -13,18 +13,18 @@ RUN corepack enable && corepack prepare pnpm@11 --activate
 WORKDIR /app
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc package.json ./
-COPY backend/package.json backend/
-COPY frontend/package.json frontend/
+COPY src/backend/package.json src/backend/
+COPY src/frontend/package.json src/frontend/
 RUN pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm --filter frontend build
 
-WORKDIR /app/backend
+WORKDIR /app/src/backend
 # `--env ""` targets the top-level (production) config; the bundle lands in /out/worker.
 RUN pnpm exec wrangler deploy --dry-run --env "" --minify --outdir /out/worker \
  && rm -f /out/worker/*.map /out/worker/README.md \
- && node ../docker/runtime-config.cjs /app/backend /out/wrangler.json \
+ && node /app/docker/runtime-config.cjs /app/src/backend /out/wrangler.json \
  && cp -r drizzle /out/drizzle \
  && cp -r ../frontend/dist /out/assets \
  && node -p "require('wrangler/package.json').version" > /out/wrangler-version

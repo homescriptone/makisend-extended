@@ -47,5 +47,5 @@ Workers keep previous deployments: **Workers & Pages → your Worker → Deploym
 
 ## Cutting a release (maintainers)
 
-1. Bump `version` in the root `package.json` **and** `APP_VERSION` in `backend/src/core/version.ts` (a test fails when they differ).
+1. Bump `version` in the root `package.json` **and** `APP_VERSION` in `src/backend/src/core/version.ts` (a test fails when they differ).
 2. Merge to `main`. `.github/workflows/release.yml` creates the tag `vX.Y.Z` and the GitHub release with generated notes. A version with a suffix (`0.3.0-rc.1`) is published as a prerelease, which instances are never told about.

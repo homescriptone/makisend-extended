@@ -4,7 +4,7 @@
 # the deploy step with `pnpm run deploy` because this script is the root `deploy`.
 #
 # It refuses to run anywhere else: our own instance deploys through GitHub Actions only
-# (.github/workflows/deploy.yml, with backend/wrangler.jsonc), never from a laptop.
+# (.github/workflows/deploy.yml, with src/backend/wrangler.jsonc), never from a laptop.
 set -euo pipefail
 
 if [ "${WORKERS_CI:-}" != "1" ]; then

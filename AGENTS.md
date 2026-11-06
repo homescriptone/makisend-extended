@@ -28,7 +28,7 @@ The product aims to provide a simple API for sending transactional emails withou
 
 ## Project structure
 
-The project follows a **NestJS-inspired modular architecture**:
+The project follows a **NestJS-inspired modular architecture**. The backend package is `src/backend/`; the tree below shows its contents (`src/` is the package's source directory, `test/` its tests):
 
 ```
 src/
@@ -105,35 +105,38 @@ test/
 
 ## Essential commands
 
+Run backend commands from `src/backend/` (or prefix them with
+`pnpm --filter ./src/backend`).
+
 ```bash
-# Install dependencies
+# Install dependencies (repository root)
 pnpm install
 
 # Start local dev server
-pnpm dev
+pnpm --filter ./src/backend dev
 
 # Generate Cloudflare Bindings types
-pnpm cf-typegen
+pnpm --filter ./src/backend cf-typegen
 
 # Run tests
-pnpm test:run
+pnpm --filter ./src/backend test:run
 
 # Run tests in watch mode
-pnpm test
+pnpm --filter ./src/backend test
 
 # Run lint
-pnpm lint
+pnpm --filter ./src/backend lint
 
 # Auto-fix lint
-pnpm lint:fix
+pnpm --filter ./src/backend lint:fix
 
 # Deploy to Cloudflare Workers
-pnpm deploy
+pnpm --filter ./src/backend deploy
 ```
 
 ## Environment variables
 
-Copy `.env.example` to `.env` and fill in:
+Copy `src/backend/.env.example` to `src/backend/.env` and fill in:
 
 | Variable | Description |
 |----------|-------------|
@@ -149,7 +152,7 @@ Not environment variables anymore:
 - **SMTP credentials, port and TLS mode** (`SMTP_USER`, `SMTP_PASSWORD`, `SENDER_EMAIL`, `HOST`, port, `tls`/`starttls`): stored per SMTP config, credentials encrypted in D1, managed through the `smtp-config` module. Ports are limited to the submission ports a Worker can reach; port 25 is refused.
 - **`API_KEY`**: API keys are per user, created via the `api-keys` module (Better Auth), and sent as `x-api-key` or `Authorization: Bearer`.
 
-These variables are mapped in `src/index.ts` via the `Bindings` type, transformed into a typed `Config` via `createConfig()`, and injected into services at runtime.
+These variables are mapped in `src/backend/src/index.ts` via the `Bindings` type, transformed into a typed `Config` via `createConfig()`, and injected into services at runtime.
 
 ## Target architecture inspired by NestJS
 
@@ -160,7 +163,7 @@ Even though the runtime remains **Hono** (not NestJS), the code organization is 
 - **Providers / Services**: business logic lives in services. They know nothing about the web framework.
 - **Repositories**: persistence is isolated behind an interface / contract (`IEmailRepository`). The concrete repository can be implemented with Drizzle/D1 today and replaced later without touching the service.
 - **DTOs / Schemas**: Zod validation schemas are extracted into `*.dto.ts` files next to the controller. They serve both as API contracts and TypeScript types (`z.infer`).
-- **Manual dependency injection**: Hono has no native IoC container. Dependencies are injected through constructors (`new Service(new Repository(...), config)`), or via controller factories that take lazy getters (`createSendEmailController(() => deps.emailRepository!, ...)`), wired in `src/index.ts`.
+- **Manual dependency injection**: Hono has no native IoC container. Dependencies are injected through constructors (`new Service(new Repository(...), config)`), or via controller factories that take lazy getters (`createSendEmailController(() => deps.emailRepository!, ...)`), wired in `src/backend/src/index.ts`.
 - **Shared kernel**: cross-cutting code (logger, errors, encryption, configuration) lives in `src/core/` and depends on no business module.
 
 ### Anti-patterns to avoid
@@ -173,7 +176,7 @@ Even though the runtime remains **Hono** (not NestJS), the code organization is 
 ## Design system
 
 - `DESIGN.md` (repository root) is the source of truth for the dashboard and the website. Read it before any UI change.
-- Tokens live in `frontend/src/styles/global.css`, mapped onto shadcn variables. `--brand*` is MakiSend green; shadcn's `--accent` stays a neutral hover fill. Use `bg-brand-subtle text-brand-strong` for active or selected states, `text-brand` for links, `text-success` / `text-warning` / `text-destructive` for statuses (always with their word).
+- Tokens live in `src/frontend/src/styles/global.css`, mapped onto shadcn variables. `--brand*` is MakiSend green; shadcn's `--accent` stays a neutral hover fill. Use `bg-brand-subtle text-brand-strong` for active or selected states, `text-brand` for links, `text-success` / `text-warning` / `text-destructive` for statuses (always with their word).
 - No Tailwind palette classes (`text-green-600`...), no `font-semibold` / `font-bold`, no `uppercase` or wide tracking, sentence case labels, one primary button per surface.
 - Controls are 44px high (`h-11`), cards use `rounded-2xl` (34px), panels `rounded-xl` (26px), controls `rounded-lg` (18px).
 
@@ -222,7 +225,7 @@ Tests: `test/unit/auth/auth-routes.test.ts` (single account, races, 2FA, passwor
 3. The hourly cron (`17 * * * *`, `src/key-rotation`) re-encrypts up to 200 values per column per run through a compare-and-swap `UPDATE` (a value edited in between is never overwritten) and logs `key-rotation: run complete` with `{reEncrypted, failed, remaining}`.
 4. Once a run logs `remaining: 0` and `failed: 0`, delete `ENCRYPTION_KEY_PREVIOUS` (and the legacy `AES_256_KEY`).
 
-**Unusable key → `/encryption-key`.** A missing or malformed key (not 64 hex characters, e.g. the `.dev.vars.example` placeholder) throws `EncryptionKeyError` (`src/core/errors.ts`): every request then answers 500 with `code` (`ENCRYPTION_KEY_MISSING` / `ENCRYPTION_KEY_INVALID`) and `variables` (names only, never values). `GET /api/setup-status` is registered before `configMiddleware` and reports it as `configError`; the login, setup and session guard send the owner to the dashboard page `/encryption-key` (`frontend/src/components/encryption-key-help.tsx`), which explains how to generate and store a key and re-checks.
+**Unusable key → `/encryption-key`.** A missing or malformed key (not 64 hex characters, e.g. the `.dev.vars.example` placeholder) throws `EncryptionKeyError` (`src/core/errors.ts`): every request then answers 500 with `code` (`ENCRYPTION_KEY_MISSING` / `ENCRYPTION_KEY_INVALID`) and `variables` (names only, never values). `GET /api/setup-status` is registered before `configMiddleware` and reports it as `configError`; the login, setup and session guard send the owner to the dashboard page `/encryption-key` (`src/frontend/src/components/encryption-key-help.tsx`), which explains how to generate and store a key and re-checks.
 
 **Never replace the key outright once the database holds data**: SMTP credentials, recipients and bodies become unreadable. Every encrypted column must be listed in `ENCRYPTED_COLUMNS` (`src/key-rotation/key-rotation.repository.ts`). The daily cron (`17 3 * * *`) still runs the SMTP health checks; `scheduled` dispatches on the expression.
 
@@ -235,7 +238,7 @@ Tests: `test/unit/auth/auth-routes.test.ts` (single account, races, 2FA, passwor
 ## Technical notes
 
 - **Per-config SMTP port/security**: `smtpPort` and `smtpSecurity` (`tls` or `starttls`) live on the SMTP config; port 465/2465 means implicit TLS, the other allowed ports require STARTTLS
-- **SMTP provider presets** live in the frontend (`frontend/src/lib/smtp-form.ts`, with the hostname cleaning), grouped (sending services, mailboxes, testing) and searchable in the form's provider field (`smtp-preset-picker.tsx`, a Base UI combobox: name, host or `keywords` such as `aws` or `sendinblue`). The security is derived from the port, never written by hand; `SMTP_PORTS` there must match `backend/src/smtp-config/smtp-host.ts`. `frontend/test/smtp-presets.test.ts` (`pnpm --filter frontend test:run`, in CI) checks ports, hints in every language and the search.
+- **SMTP provider presets** live in the frontend (`src/frontend/src/lib/smtp-form.ts`, with the hostname cleaning), grouped (sending services, mailboxes, testing) and searchable in the form's provider field (`smtp-preset-picker.tsx`, a Base UI combobox: name, host or `keywords` such as `aws` or `sendinblue`). The security is derived from the port, never written by hand; `SMTP_PORTS` there must match `src/backend/src/smtp-config/smtp-host.ts`. `src/frontend/test/smtp-presets.test.ts` (`pnpm --filter frontend test:run`, in CI) checks ports, hints in every language and the search.
 - **Cloudflare Email Service**: a config on `smtp.mx.cloudflare.net` is sent through the `send_email` binding (`EMAIL`, `src/send-email/cloudflare-email.transport.ts`), never a socket (workerd refuses it). The transport resolver, `SmtpConfigService` (check, test send) and the daily health check all branch on `isCloudflareEmailHost`. Bindings are not inherited by `env.preview`: declare `send_email` in both.
 - **Test sends are logged**: `email_logs.source` is `"api"` or `"test"`; a test carries `smtp_config_id` (no API key). The `smtpConfigId` log filter returns the config's keys' sends plus its tests; dashboard totals count `source = "api"` only.
 - **Several API keys per SMTP config** (`apikey.smtp_config_id` is indexed, not unique). Per-key metrics: `GET /dashboard/by-api-key`; logs filter `apiKeyId`.
@@ -278,7 +281,7 @@ Tests: `test/unit/auth/auth-routes.test.ts` (single account, races, 2FA, passwor
 - Migrations: managed in the `drizzle/` folder
 - Wrangler binding: `makisend_db`
 - Email bodies live in `email_contents` (encrypted, keyed by `email_logs.internalId`); attachments live in `email_attachments`, one encrypted row per file (base64 then AES-GCM), never in the queue; templates store visual-builder JSON (theme + TipTap content) or pasted TSX source alongside exported HTML/text;
-- **Attachments, end to end**: the same Resend-shaped `attachments` are accepted by `POST /send-email` and by the dashboard's test send (`POST /smtp-config/:id/test-send`, "Attach a file" in `smtp-test-send-dialog.tsx`); both validate through `send-email/attachments.ts` (`AttachmentsDto`) and both senders carry them (SMTP and the Cloudflare `send_email` binding). The frontend repeats the limits in `frontend/src/lib/attachments.ts` (keep them equal). `pnpm test:e2e:attachments` (`test/e2e/run-attachments.sh` + `attachments.ts`) runs the real Worker under `wrangler dev`, sends files through both doors to a Cloudflare Email Service configuration and compares, byte for byte, the files Miniflare's local binding writes; it leaves `test/e2e/reports/attachments.json` to diff.
+- **Attachments, end to end**: the same Resend-shaped `attachments` are accepted by `POST /send-email` and by the dashboard's test send (`POST /smtp-config/:id/test-send`, "Attach a file" in `smtp-test-send-dialog.tsx`); both validate through `send-email/attachments.ts` (`AttachmentsDto`) and both senders carry them (SMTP and the Cloudflare `send_email` binding). The frontend repeats the limits in `src/frontend/src/lib/attachments.ts` (keep them equal). `pnpm test:e2e:attachments` (`test/e2e/run-attachments.sh` + `attachments.ts`) runs the real Worker under `wrangler dev`, sends files through both doors to a Cloudflare Email Service configuration and compares, byte for byte, the files Miniflare's local binding writes; it leaves `test/e2e/reports/attachments.json` to diff.
   queue/workflow payloads carry only `emailId`
 - HTTP idempotency reservations/responses live in `idempotency_keys` (24h TTL)
 
@@ -287,14 +290,14 @@ Tests: `test/unit/auth/auth-routes.test.ts` (single account, races, 2FA, passwor
 Deployment is done via Wrangler:
 
 ```bash
-pnpm --filter frontend build   # required first: the Worker serves frontend/dist
-pnpm deploy                    # backend/ — uploads Worker + static assets
+pnpm --filter frontend build   # required first: the Worker serves src/frontend/dist
+pnpm deploy                    # src/backend/ — uploads Worker + static assets
 ```
 
 Config: `wrangler.jsonc`
 
 - Worker name: `makisend-poc`
-- Entry point: `src/index.ts`
+- Entry point: `src/backend/src/index.ts`
 - Compatibility: `2026-07-10` with `nodejs_compat` flag
 - Observability: logs enabled
 - D1 binding: `makisend_db`
@@ -305,11 +308,11 @@ Config: `wrangler.jsonc`
 
 ## Deploy to Cloudflare button and updates
 
-- **Two Wrangler configs, one Worker.** `backend/wrangler.jsonc` drives our own deployments (GitHub Actions). The **root** `wrangler.jsonc` + root `package.json` (`build`, `deploy`, `cloudflare.bindings`) + `.dev.vars.example` drive the *Deploy to Cloudflare* button and Workers Builds in users' copies. Add a binding, queue, workflow or cron to **both**: `test/unit/config/root-wrangler.test.ts` fails otherwise. The root file keeps a placeholder `database_id`.
+- **Two Wrangler configs, one Worker.** `src/backend/wrangler.jsonc` drives our own deployments (GitHub Actions). The **root** `wrangler.jsonc` + root `package.json` (`build`, `deploy`, `cloudflare.bindings`) + `.dev.vars.example` drive the *Deploy to Cloudflare* button and Workers Builds in users' copies. Add a binding, queue, workflow or cron to **both**: `test/unit/config/root-wrangler.test.ts` fails otherwise. The root file keeps a placeholder `database_id`.
 - The root `deploy` script (`scripts/workers-builds-deploy.sh`) refuses to run unless `WORKERS_CI=1`; the GitHub Actions deploy jobs are guarded by `github.repository == 'lixalistudio-oss/makisend'` so copies never try to use our secrets.
-- `BETTER_AUTH_URL` / `FRONTEND_URL` are optional: `withPublicUrls` (`src/index.ts`) falls back to the request origin (same-origin Worker), which is what a button install has.
+- `BETTER_AUTH_URL` / `FRONTEND_URL` are optional: `withPublicUrls` (`src/backend/src/index.ts`) falls back to the request origin (same-origin Worker), which is what a button install has.
 - **Versioning**: `APP_VERSION` (`src/core/version.ts`) must equal the root `package.json` `version` (tested). Bumping both on `main` makes `.github/workflows/release.yml` publish `vX.Y.Z`.
-- **Update check** (`src/updates/`): reads `GET /repos/{UPDATE_SOURCE_REPOSITORY}/releases/latest` unauthenticated, stores the result in the single-row `update_check` table, refreshed by the daily cron and at most daily (or every 5 min with `?refresh=true`) from `GET /updates/status`. `UPDATE_CHECK=off` = no GitHub call. A failed check keeps the last known release and records `error`. Dashboard: `frontend/src/components/update-banner.tsx` (banner + Settings card).
+- **Update check** (`src/updates/`): reads `GET /repos/{UPDATE_SOURCE_REPOSITORY}/releases/latest` unauthenticated, stores the result in the single-row `update_check` table, refreshed by the daily cron and at most daily (or every 5 min with `?refresh=true`) from `GET /updates/status`. `UPDATE_CHECK=off` = no GitHub call. A failed check keeps the last known release and records `error`. Dashboard: `src/frontend/src/components/update-banner.tsx` (banner + Settings card).
 - **Installing an update** in a copy: `.github/workflows/sync-upstream.yml` merges the release tag and keeps the copy's `wrangler.jsonc`; see `docs/UPDATING.md`.
 
 ## API documentation

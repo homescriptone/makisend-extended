@@ -6,10 +6,10 @@
 	//
 	// During the button's set-up Cloudflare creates the D1 database and the queues under the
 	// names chosen there, and writes the new database_id into the copy's wrangler.jsonc.
-	"$schema": "backend/node_modules/wrangler/config-schema.json",
+	"$schema": "src/backend/node_modules/wrangler/config-schema.json",
 	"name": "makisend",
-	"main": "./backend/src/index.ts",
-	"tsconfig": "./backend/tsconfig.json",
+	"main": "./src/backend/src/index.ts",
+	"tsconfig": "./src/backend/tsconfig.json",
 	"compatibility_date": "2026-07-10",
 	"compatibility_flags": [
 		"nodejs_compat"
@@ -17,7 +17,7 @@
 	// The Worker serves the dashboard too (Astro build, `pnpm run build`) and the API on the
 	// same origin.
 	"assets": {
-		"directory": "./frontend/dist",
+		"directory": "./src/frontend/dist",
 		"binding": "ASSETS"
 	},
 	"observability": {
@@ -42,8 +42,8 @@
 			"binding": "makisend_db",
 			"database_name": "makisend-db",
 			"database_id": "00000000-0000-4000-8000-000000000000",
-			"migrations_dir": "./backend/drizzle",
-			"migrations_pattern": "backend/drizzle/*.sql"
+			"migrations_dir": "./src/backend/drizzle",
+			"migrations_pattern": "src/backend/drizzle/*.sql"
 		}
 	],
 	"queues": {

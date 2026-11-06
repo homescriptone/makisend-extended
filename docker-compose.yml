@@ -10,7 +10,7 @@ services:
       context: .
       dockerfile: Dockerfile
     init: true
-    working_dir: /workspace/backend
+    working_dir: /workspace/src/backend
     # --ip 0.0.0.0 is required so the host can reach workerd inside the container.
     command: pnpm exec wrangler dev --local --ip 0.0.0.0
     ports:
@@ -21,7 +21,7 @@ services:
       - .:/workspace:z
       # Keep container-installed linux binaries (workerd, esbuild, better-sqlite3)
       # instead of whatever is on the host mount:
-      - backend-node-modules:/workspace/backend/node_modules
+      - backend-node-modules:/workspace/src/backend/node_modules
       - root-node-modules:/workspace/node_modules
     # .env / .dev.vars are read by wrangler itself from the working directory
     # (bind-mounted) — same behavior as running on the host. No env_file here,
@@ -32,7 +32,7 @@ services:
       context: .
       dockerfile: Dockerfile
     init: true
-    working_dir: /workspace/frontend
+    working_dir: /workspace/src/frontend
     command: pnpm exec astro dev --host
     environment:
       BACKEND_URL: http://backend:8787
@@ -40,7 +40,7 @@ services:
       - "4321:4321"
     volumes:
       - .:/workspace:z
-      - frontend-node-modules:/workspace/frontend/node_modules
+      - frontend-node-modules:/workspace/src/frontend/node_modules
       - root-node-modules:/workspace/node_modules
     depends_on:
       - backend

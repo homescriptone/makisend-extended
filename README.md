@@ -66,7 +66,7 @@ flowchart LR
     client["Client application<br/>API key mk_…"]
 
     subgraph worker["Cloudflare Worker « makisend-poc »"]
-        assets["Static assets<br/>frontend/dist"]
+        assets["Static assets<br/>src/frontend/dist"]
         mw["Hono<br/>global middlewares"]
         auth["/api/auth/*<br/>Better Auth"]
         dash["Dashboard routes<br/>session"]
@@ -120,11 +120,11 @@ Two crons complete the picture: a daily SMTP health check of every configuration
 
 ```
 makisend/
-├── backend/     # Cloudflare Worker: one folder per module (controller → service → repository + dto),
-│                # drizzle/ migrations, test/ (Vitest unit + Miniflare integration)
-├── frontend/    # Astro + React dashboard, built into frontend/dist
-├── docs/        # Architecture, developer guide, updating
-└── .github/     # CI and deployment (GitHub Actions)
+├── src/backend/     # Cloudflare Worker: one folder per module (controller → service → repository + dto),
+│                    # drizzle/ migrations, test/ (Vitest unit + Miniflare integration)
+├── src/frontend/    # Astro + React dashboard, built into src/frontend/dist
+├── docs/            # Architecture, developer guide, updating
+└── .github/         # CI and deployment (GitHub Actions)
 ```
 
 ---
@@ -135,18 +135,18 @@ Prerequisites: Node.js 22+, pnpm, and SMTP credentials from a provider. A Cloudf
 
 ```bash
 pnpm install
-cp backend/.env.example backend/.env   # then fill it in (see Configuration)
-pnpm --filter ./backend dev            # API on http://localhost:8787
-pnpm --filter ./frontend dev           # dashboard on http://localhost:4321
+cp src/backend/.env.example src/backend/.env   # then fill it in (see Configuration)
+pnpm --filter ./src/backend dev            # API on http://localhost:8787
+pnpm --filter ./src/frontend dev           # dashboard on http://localhost:4321
 ```
 
 The first connection to the dashboard creates the administrator account. Then create an SMTP configuration and an API key linked to it.
 
-Backend commands, run from `backend/`: `pnpm test` (watch), `pnpm test:run`, `pnpm test:ui`, `pnpm test:coverage`, `pnpm lint`, `pnpm lint:fix`, `pnpm cf-typegen`. Migrations, end-to-end tests and debugging are in [`docs/DEVELOPER_GUIDE.md`](./docs/DEVELOPER_GUIDE.md).
+Backend commands, run from `src/backend/`: `pnpm test` (watch), `pnpm test:run`, `pnpm test:ui`, `pnpm test:coverage`, `pnpm lint`, `pnpm lint:fix`, `pnpm cf-typegen`. Migrations, end-to-end tests and debugging are in [`docs/DEVELOPER_GUIDE.md`](./docs/DEVELOPER_GUIDE.md).
 
 ### Configuration
 
-Set in `backend/.env` locally, as Worker secrets once deployed:
+Set in `src/backend/.env` locally, as Worker secrets once deployed:
 
 | Variable | Description |
 |----------|-------------|
@@ -169,7 +169,7 @@ pnpm docker:up        # API :8787 (wrangler dev --local), dashboard :4321
 pnpm docker:test      # also: docker:lint, docker:migrate, docker:down
 ```
 
-Hot reload works on both services, local D1/Queues/Workflows state persists in `backend/.wrangler`, and no secret is copied into the image. Do not run `pnpm dev` on the host at the same time (port 8787). A devcontainer (`.devcontainer/`) reuses the same compose file.
+Hot reload works on both services, local D1/Queues/Workflows state persists in `src/backend/.wrangler`, and no secret is copied into the image. Do not run `pnpm dev` on the host at the same time (port 8787). A devcontainer (`.devcontainer/`) reuses the same compose file.
 
 ### Self-host on a VPS
 
@@ -184,7 +184,7 @@ docker run -d --name makisend -p 8787:8787 -v makisend-data:/data \
 
 For a real server (domain, HTTPS with Caddy, updates, backups), follow [`docs/SELF_HOST_VPS.md`](docs/SELF_HOST_VPS.md) and use [`docker/compose.vps.yml`](docker/compose.vps.yml). Keep both secrets (a lost `ENCRYPTION_KEY` makes stored data unreadable) and the `/data` volume.
 
-This is a **single-instance** set-up: not the scalable Cloudflare deployment, and the Cloudflare Email Service configuration is unavailable (use any SMTP provider on 465/587). `pnpm test:e2e:docker` (in `backend/`) (also run in CI and before each image push) starts the image next to Mailpit and checks a real send, cron and persistence across a restart. The image comes from `docker/Dockerfile`; the root `Dockerfile` stays the development image.
+This is a **single-instance** set-up: not the scalable Cloudflare deployment, and the Cloudflare Email Service configuration is unavailable (use any SMTP provider on 465/587). `pnpm test:e2e:docker` (in `src/backend/`) (also run in CI and before each image push) starts the image next to Mailpit and checks a real send, cron and persistence across a restart. The image comes from `docker/Dockerfile`; the root `Dockerfile` stays the development image.
 
 ---
 
@@ -255,13 +255,13 @@ Our deployments go **only through GitHub Actions** (`.github/workflows/deploy.ym
 | Pull request to `main` or `dev` | Preview Worker `makisend-poc-preview`, with a D1 database recreated on every deploy and its own `-preview` queues |
 | Push | Remote D1 migrations, queue creation if needed, then deploy of the `makisend-poc` Worker |
 
-Both jobs run after lint, tests and the frontend build. The Cloudflare configuration is `backend/wrangler.jsonc`. GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `AES_256_KEY` (preview), `BETTER_AUTH_SECRET`. The production Worker reads its own Cloudflare secrets (see [Configuration](#configuration)); the job checks that they exist.
+Both jobs run after lint, tests and the frontend build. The Cloudflare configuration is `src/backend/wrangler.jsonc`. GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `AES_256_KEY` (preview), `BETTER_AUTH_SECRET`. The production Worker reads its own Cloudflare secrets (see [Configuration](#configuration)); the job checks that they exist.
 
 ### Deploy to Cloudflare (one click)
 
 The button at the top of this page first opens [makisend.lixalistudio.tech/deploy](https://makisend.lixalistudio.tech/deploy/), which explains the two secrets Cloudflare will ask for and how to generate them: `ENCRYPTION_KEY` (`openssl rand -hex 32`, 64 hex characters, **keep a copy**) and `BETTER_AUTH_SECRET` (`openssl rand -base64 32`). It can also generate them in your browser. **Continue to Cloudflare** then opens Cloudflare's flow ([direct link](https://deploy.workers.cloudflare.com/?url=https://github.com/lixalistudio-oss/makisend)): it copies the repository into your GitHub (or GitLab) account, lets you name the Worker, the D1 database and the queues, asks for the two secrets (paste each value into the field with the same name), then creates the resources and deploys with Workers Builds. Open the Worker's URL to create the administrator account, turn on 2FA and, if the API is reachable from the internet, set `SEND_RATE_LIMIT`.
 
-The button uses the **root** `wrangler.jsonc` and `package.json`; a test keeps them in sync with `backend/wrangler.jsonc` (details in [`AGENTS.md`](./AGENTS.md)).
+The button uses the **root** `wrangler.jsonc` and `package.json`; a test keeps them in sync with `src/backend/wrangler.jsonc` (details in [`AGENTS.md`](./AGENTS.md)).
 
 ### Updates
 

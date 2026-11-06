@@ -8,14 +8,14 @@ You are taking over a clone of **MakiSend**, a self-hosted transactional email s
 
 ## 1. Learn the repo
 
-Read `AGENTS.md` (architecture, conventions, security model, key rotation), then `README.md` (Configuration, Deployment, Security) and `backend/wrangler.jsonc`. Done when you can state: which Cloudflare resources the Worker binds, which secrets it reads, and how the dashboard and the API share one origin.
+Read `AGENTS.md` (architecture, conventions, security model, key rotation), then `README.md` (Configuration, Deployment, Security) and `src/backend/wrangler.jsonc`. Done when you can state: which Cloudflare resources the Worker binds, which secrets it reads, and how the dashboard and the API share one origin.
 
 Verify the code before touching the account:
 
 ```bash
 pnpm install --frozen-lockfile
-cd backend && pnpm lint && pnpm exec tsc --noEmit && pnpm test:run && cd ..
-pnpm --filter frontend build    # the Worker serves frontend/dist
+cd src/backend && pnpm lint && pnpm exec tsc --noEmit && pnpm test:run && cd ..
+pnpm --filter frontend build    # the Worker serves src/frontend/dist
 ```
 
 All green, or stop and report.
@@ -39,7 +39,7 @@ cf queues create --queue-name makisend-send-email
 cf queues create --queue-name makisend-send-email-dlq
 ```
 
-Then edit `backend/wrangler.jsonc`, top-level (production) section only:
+Then edit `src/backend/wrangler.jsonc`, top-level (production) section only:
 
 - `name` → the Worker name;
 - `d1_databases[0].database_id` → the uuid above (the one in the file belongs to the upstream instance), `database_name` → the D1 name;
@@ -50,7 +50,7 @@ Leave binding names (`makisend_db`, `SEND_EMAIL_QUEUE`, `SEND_EMAIL_DLQ`, `SEND_
 ## 4. Apply the schema
 
 ```bash
-cd backend
+cd src/backend
 cf d1 migrations apply <d1-uuid> --dir drizzle
 ```
 
@@ -58,10 +58,10 @@ Drizzle Kit owns the schema: migrations only move forward. Never drop, delete or
 
 ## 5. Deploy the Worker
 
-The repo is a Wrangler project and uses **Cloudflare Workflows**, which `cf`'s own config (`cf migrate`) does not support yet. Upload the Worker with the Wrangler version pinned in `backend/package.json`, keep `cf` for everything else:
+The repo is a Wrangler project and uses **Cloudflare Workflows**, which `cf`'s own config (`cf migrate`) does not support yet. Upload the Worker with the Wrangler version pinned in `src/backend/package.json`, keep `cf` for everything else:
 
 ```bash
-cd backend && pnpm exec wrangler deploy --minify
+cd src/backend && pnpm exec wrangler deploy --minify
 ```
 
 Get the public URL: `cf workers get <worker>` (`*.workers.dev`), or the custom domain if the user set one.

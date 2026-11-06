@@ -260,6 +260,100 @@ Before architectural changes:
 
 **Exit criteria:** The team can explain what currently prevents native standalone execution and has a verified baseline before refactoring.
 
+#### Phase 0 audit — results (6 Nov 2026)
+
+The repository was moved into a `src/` layout (`src/backend`, `src/frontend`) without updating the references around it, so the application could not install, build, test or deploy from the documented commands. This audit records what was broken, what was repaired, the verified baseline, and the Cloudflare couplings that still block native execution.
+
+**Repaired in this slice (no behavior change):** developer documentation (`README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `docs/*.md`, `.dev.vars.example`) was updated to the same `src/` paths; it is part of the repair, not a separate phase.
+
+| Area | Stale reference | Fix |
+|---|---|---|
+| Workspace | `pnpm-workspace.yaml` listed `backend` and `frontend` (removed directories) | `src/backend`, `src/frontend`; lockfile refreshed because pnpm keys importers by directory |
+| Wrangler (root, "Deploy to Cloudflare" button) | `main`, `tsconfig`, `assets.directory`, D1 `migrations_dir` / `migrations_pattern`, `$schema` | all point under `src/` |
+| Docker (dev) | `COPY backend/…`, `WORKDIR /workspace/backend` | `src/backend`, `src/frontend` |
+| Docker (published image) | `COPY backend/…`, `WORKDIR /app/backend`, `node ../docker/runtime-config.cjs /app/backend` | `src/` paths, absolute `/app/docker/runtime-config.cjs` |
+| docker-compose | working directories and `node_modules` volumes | `src/backend`, `src/frontend` |
+| GitHub Actions | every `working-directory: backend` / `frontend`, `frontend/dist` artifacts, `backend/src/core/version.ts` in release.yml | `src/…` paths |
+| Tests | repo-root discovery (`root-wrangler.test.ts`, `updates.test.ts`) and the root asset-path assertion | one level deeper, `./src/frontend/dist` |
+
+**Verified baseline (commands run from the repository root unless noted):**
+
+| Check | Command | Result |
+|---|---|---|
+| Install | `pnpm install --no-frozen-lockfile` (lockfile updated for the new importer paths) | pass |
+| Lint | `pnpm lint` in `src/backend` | pass |
+| Typecheck backend | `pnpm exec tsc --noEmit` in `src/backend` | pass |
+| Backend tests | `pnpm test:run` in `src/backend` | 46 files, 537 tests pass |
+| Typecheck frontend | `pnpm exec tsc --noEmit -p .` in `src/frontend` | pass |
+| Frontend tests | `pnpm test:run` in `src/frontend` | 12 tests pass |
+| Frontend build | `pnpm --filter frontend build` | 12 pages built into `src/frontend/dist` |
+| Worker bundle (button config) | `pnpm exec wrangler deploy --dry-run --minify` at the root | bundles, reads 83 assets from `src/frontend/dist`, all bindings resolve |
+| Worker bundle (own deployments) | `pnpm exec wrangler deploy --dry-run --minify` in `src/backend` | same |
+| Image config | `node docker/runtime-config.cjs src/backend <out>` | valid config generated from `src/backend/wrangler.jsonc` |
+| Migrations | `pnpm exec wrangler d1 migrations list makisend_db --local` | 7 migrations listed |
+| Local boot | `pnpm exec wrangler dev --local` in `src/backend`, then `GET /api/setup-status` | boots, applies the schema and answers `{"needsSetup":true}` |
+
+**Cloudflare couplings that still block native Node.js execution:**
+
+1. `src/backend/src/index.ts` is the only entry point: it exports the Worker shape (`fetch`, `queue`, `scheduled`) plus the `SendEmailWorkflow` class, and owns the lazy dependency container.
+2. The `Bindings` type is imported by `src/backend/src/config/config.ts` and `src/backend/src/lib/auth.ts`, so configuration depends on Cloudflare binding types.
+3. `src/backend/src/db/connection.ts` hardcodes `drizzle-orm/d1`; `src/backend/src/lib/auth.ts` creates a second D1-backed Drizzle instance for Better Auth.
+4. `src/backend/src/send-email/send-email.controller.ts` calls `c.env.SEND_EMAIL_QUEUE.send(...)` directly — queue access leaks into the HTTP layer.
+5. `src/backend/src/queue/send-email.consumer.ts` depends on the Cloudflare `MessageBatch` API (`ack`, `retry`, `attempts`).
+6. `src/backend/src/workflows/send-email.workflow.ts` and `send-email.flow.ts` depend on `cloudflare:workers` (`WorkflowEntrypoint`, `WorkflowStep`); the Vitest config already shims the module with `test/mocks/cloudflare-workers.ts`, which proves the coupling.
+7. The `scheduled` handler relies on `ctx.waitUntil` and cron strings declared in `wrangler.jsonc`; the VPS image reimplements this with `docker/scheduler.mjs` calling `/cdn-cgi/handler/scheduled`.
+8. Cloudflare Email Service (`send_email` binding) branches are spread across `transport-resolver.ts`, `smtp-config.service.ts` and `smtp-health.ts`.
+9. Static files are served by the platform (`assets.directory`); there is no Node static server.
+10. Tests run D1 through Miniflare/workerd (`test/helpers/d1-setup.ts`); there is no local SQLite driver path yet, although `better-sqlite3` is already a dev dependency.
+
+#### Target structure (adapter boundaries)
+
+The target keeps the existing module internals and only moves the runtime-specific edges behind explicit boundaries. Composition happens once, at the entry points; no `if (isCloudflare)` in domain services.
+
+```text
+src/backend/src/
+├── app/                      # runtime-agnostic composition root
+│   ├── env.ts                # AppEnv: typed configuration (no D1/Queue/Workflow types)
+│   ├── container.ts          # lazy DI container (today inside index.ts)
+│   └── app.ts                # buildApp(container) -> Hono (controllers + middleware)
+├── core/                     # unchanged shared kernel
+├── db/
+│   ├── schema.ts             # unchanged Drizzle schema
+│   └── client.ts             # Database type + createDatabase(provider)
+├── domain/                   # business modules, unchanged internals
+│   ├── send-email/  templates/  smtp-config/  email-logs/  dashboard/
+│   ├── idempotency/  api-keys/  send-rate-limit/  key-rotation/  updates/
+├── http/                     # controllers + middleware (Hono-specific)
+├── infrastructure/
+│   ├── database/             # d1.ts, sqlite.ts, turso.ts
+│   ├── queue/                # port.ts, cloudflare.ts, local.ts
+│   ├── workflow/             # port.ts, cloudflare.ts, local.ts
+│   ├── scheduler/            # port.ts, cloudflare.ts, local.ts
+│   └── email/                # smtp.ts, cloudflare.ts
+└── runtime/
+    ├── cloudflare/entry.ts   # fetch/queue/scheduled + Workflow class export
+    └── node/
+        ├── server.ts         # @hono/node-server + static assets + graceful shutdown
+        ├── worker.ts         # persistent local queue poller
+        └── scheduler.ts      # local cron for key rotation and health checks
+```
+
+The current `src/index.ts` keeps working during the migration: it becomes a thin Cloudflare adapter that imports `buildApp(...)`.
+
+#### Implementation sequence (small, testable slices)
+
+| Slice | Scope | Exit criterion | Status |
+|---|---|---|---|
+| S0 | Repair the `src/` restructure | install, lint, typecheck, tests, build and both `wrangler deploy --dry-run` pass | done (6 Nov 2026) |
+| S1 | Extract `app/env.ts`, `app/container.ts`, `app/app.ts`; `src/index.ts` becomes `runtime/cloudflare/entry.ts` re-exported from the old path | no behavior change, tests unchanged | next |
+| S2 | Database port: `createDatabase({ provider: "d1" \| "sqlite" \| "turso" })`; Better Auth receives the shared `Database` instance | D1 tests pass; new SQLite integration test applies the same migrations | planned |
+| S3 | Job queue port: `JobQueue.enqueue(emailId)` injected into the send-email controller; Cloudflare and local adapters | controller no longer reads `c.env`; queue tests cover both adapters | planned |
+| S4 | Workflow port: `SendEmailFlow` runs steps through a `StepRunner`; Cloudflare adapter wraps `WorkflowStep`, local adapter executes with the same retry budget | workflow tests run against both runners | planned |
+| S5 | Scheduler port: cron dispatch behind `Scheduler`; Cloudflare events and local timer share one dispatcher | `docker/scheduler.mjs` replaced by the Node runtime scheduler | planned |
+| S6 | Node runtime: `runtime/node/server.ts` (API + dashboard + static assets), `worker.ts` (persistent queue), health/readiness, graceful shutdown | `pnpm start` serves the complete app without Docker or Cloudflare bindings | planned |
+
+Documentation updates (README, AGENTS.md, CONTRIBUTING.md, `docs/*.md`) follow each slice; they are not a separate phase.
+
 ### Phase 1 — Architecture and runtime decoupling
 
 - Introduce only the infrastructure interfaces justified by the audit.
@@ -441,6 +535,7 @@ For each meaningful change:
 
 This roadmap is a living document.
 
+- **Canonical file:** `REDESIGN_HOMESCRIPT.md`. `MAKISEND_EXTENDED_ROADMAP.md` is a byte-identical copy and is kept only until this file is confirmed as the single source; delete it then.
 - Mark phases and tasks as planned, in progress, blocked, or completed in a separate progress tracker or issue list.
 - Update this document when a significant architectural decision changes.
 - Record important decisions in architecture decision records (ADRs).

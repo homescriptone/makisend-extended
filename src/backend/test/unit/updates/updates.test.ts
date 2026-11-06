@@ -67,7 +67,7 @@ describe("U1 compareVersions", () => {
 
 describe("U2 APP_VERSION", () => {
   it("equals the root package.json version that release.yml tags", () => {
-    const pkg = JSON.parse(readFileSync(join(here, "../../../../package.json"), "utf8")) as { version: string };
+    const pkg = JSON.parse(readFileSync(join(here, "../../../../..", "package.json"), "utf8")) as { version: string };
     expect(APP_VERSION).toBe(pkg.version);
     expect(normalizeVersion(APP_VERSION)).toBe(APP_VERSION);
   });
@@ -115,7 +115,7 @@ describe("settings", () => {
   });
 
   it("the root wrangler.jsonc pre-fills MAKISEND_REPOSITORY with the official repository", () => {
-    const wrangler = readFileSync(join(here, "../../../../wrangler.jsonc"), "utf8");
+    const wrangler = readFileSync(join(here, "../../../../..", "wrangler.jsonc"), "utf8");
     expect(wrangler).toContain(`"MAKISEND_REPOSITORY": "${DEFAULT_UPSTREAM_REPOSITORY}"`);
   });
 });

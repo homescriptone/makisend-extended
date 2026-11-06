@@ -43,23 +43,23 @@ jobs:
 
       - name: Run lint
         run: pnpm lint
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Typecheck backend
         run: pnpm exec tsc --noEmit
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Run tests
         run: pnpm test:run
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Typecheck frontend (also proves every language has every key)
         run: pnpm exec tsc --noEmit -p .
-        working-directory: frontend
+        working-directory: src/frontend
 
       - name: Test frontend
         run: pnpm test:run
-        working-directory: frontend
+        working-directory: src/frontend
 
       - name: Build frontend
         run: pnpm --filter frontend build
@@ -91,4 +91,4 @@ jobs:
       # a mail goes out through the API, that cron works and that data survives a restart.
       - name: Run the Docker end-to-end test
         run: pnpm test:e2e:docker
-        working-directory: backend
+        working-directory: src/backend

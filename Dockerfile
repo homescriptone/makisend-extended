@@ -8,14 +8,14 @@ WORKDIR /workspace
 
 # 1) Dependency layer first — cached across source edits.
 COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc package.json ./
-COPY backend/package.json backend/
-COPY frontend/package.json frontend/
+COPY src/backend/package.json src/backend/
+COPY src/frontend/package.json src/frontend/
 RUN pnpm install --frozen-lockfile
 
 # 2) Source. node_modules, .wrangler and secret files are excluded by .dockerignore;
 #    compose bind-mounts the repo over /workspace at run time anyway.
 COPY . .
 
-WORKDIR /workspace/backend
+WORKDIR /workspace/src/backend
 
 CMD ["pnpm", "dev"]

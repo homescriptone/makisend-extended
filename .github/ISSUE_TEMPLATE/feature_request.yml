@@ -1,8 +1,8 @@
 name: Feature request
- description: Propose a new feature
- title: "[FEATURE] "
- labels: ["enhancement"]
- body:
+description: Propose a new feature
+title: "[FEATURE] "
+labels: ["enhancement"]
+body:
    - type: markdown
      attributes:
        value: |

@@ -42,11 +42,11 @@ cd makisend
 pnpm install
 
 # Local Worker secrets (wrangler dev reads .dev.vars, not .env)
-cp backend/.env.example backend/.dev.vars
+cp src/backend/.env.example src/backend/.dev.vars
 # set ENCRYPTION_KEY (openssl rand -hex 32) and BETTER_AUTH_SECRET (openssl rand -base64 32)
 
 # Local D1 schema
-cd backend
+cd src/backend
 pnpm exec wrangler d1 migrations apply makisend_db --local
 
 # Terminal 1: Worker API on http://localhost:8787
@@ -65,12 +65,12 @@ More detail (configuration, debugging, pitfalls) lives in [`docs/DEVELOPER_GUIDE
 ## Project layout
 
 ```
-backend/    Cloudflare Worker: Hono API, D1 (Drizzle), Queues, Workflows
+src/backend/    Cloudflare Worker: Hono API, D1 (Drizzle), Queues, Workflows
   src/<module>/   one folder per domain: controller, dto, service, repository, types, index
   src/core/       shared kernel: errors, logger, crypto, HTML sanitizer
   drizzle/        SQL migrations
   test/           unit, integration and e2e tests (Vitest)
-frontend/   Astro + React dashboard (shadcn/ui), served by the same Worker
+src/frontend/   Astro + React dashboard (shadcn/ui), served by the same Worker
   src/i18n/       UI dictionaries, one folder per language
 docs/       architecture, developer guide, self-hosting and update guides
 ```
@@ -106,7 +106,7 @@ Security rules that a pull request must not weaken:
 
 ## Tests
 
-Run from `backend/`:
+Run from `src/backend/`:
 
 ```bash
 pnpm lint              # ESLint
@@ -118,17 +118,17 @@ And from the repository root:
 
 ```bash
 pnpm --filter frontend build
-cd frontend && pnpm exec tsc --noEmit -p .   # the build does not typecheck
+cd src/frontend && pnpm exec tsc --noEmit -p .   # the build does not typecheck
 ```
 
 CI runs lint, typecheck, tests and the frontend build on every pull request; it must be green before a merge.
 
-Tests are typed: no `as unknown as` casts and no hand-rolled mocks of whole libraries. Use the helpers in `backend/test/helpers` and `backend/test/mocks`, and reset mocks in `beforeEach`.
+Tests are typed: no `as unknown as` casts and no hand-rolled mocks of whole libraries. Use the helpers in `src/backend/test/helpers` and `src/backend/test/mocks`, and reset mocks in `beforeEach`.
 
 ## Database migrations
 
-- The schema lives in `backend/src/db/schema.ts`.
-- Generate a migration with `pnpm db:generate` (Drizzle Kit) from `backend/`, review the SQL, and commit it with the schema change.
+- The schema lives in `src/backend/src/db/schema.ts`.
+- Generate a migration with `pnpm db:generate` (Drizzle Kit) from `src/backend/`, review the SQL, and commit it with the schema change.
 - Migrations must be **additive**: never drop a table or a column that a deployed instance still reads, never edit a migration that was already released. Self-hosted instances apply them in order on update.
 - Apply locally with `pnpm exec wrangler d1 migrations apply makisend_db --local`.
 
@@ -136,9 +136,9 @@ Tests are typed: no `as unknown as` casts and no hand-rolled mocks of whole libr
 
 The dashboard is available in English and French. No user-visible string lives in a component: every label goes through `t("feature.key")` from `@/i18n`.
 
-- English (`frontend/src/i18n/en/`) is the reference. Every other language is typed on its keys, so a missing translation fails `tsc --noEmit`.
+- English (`src/frontend/src/i18n/en/`) is the reference. Every other language is typed on its keys, so a missing translation fails `tsc --noEmit`.
 - A new string: add the key to the English file of the feature **and** to every other language, with a real translation.
-- A new language: add one row to `LANGUAGES` in `frontend/src/i18n/config.ts`, copy the `en/` folder to the new code, translate it, and register it in `frontend/src/i18n/index.ts`.
+- A new language: add one row to `LANGUAGES` in `src/frontend/src/i18n/config.ts`, copy the `en/` folder to the new code, translate it, and register it in `src/frontend/src/i18n/index.ts`.
 - Brand names, code samples, HTTP paths and API field names are not translated.
 
 ## Commits and pull requests

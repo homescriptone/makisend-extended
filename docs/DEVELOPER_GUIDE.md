@@ -24,23 +24,23 @@
 pnpm install
 
 # Local Worker secrets/vars
-cp backend/.env.example backend/.dev.vars
-# edit backend/.dev.vars (see §3)
+cp src/backend/.env.example src/backend/.dev.vars
+# edit src/backend/.dev.vars (see §3)
 
 # Create the local D1 schema
-cd backend
+cd src/backend
 pnpm exec wrangler d1 migrations apply makisend_db --local
 
 # Terminal 1 — Worker API on http://localhost:8787
 pnpm dev
 
 # Terminal 2 — Astro dashboard on http://localhost:4321
-pnpm --filter ./frontend dev
+pnpm --filter ./src/frontend dev
 ```
 
-> `wrangler dev` reads **`backend/.dev.vars`**, not `.env`. The `.env.example`
+> `wrangler dev` reads **`src/backend/.dev.vars`**, not `.env`. The `.env.example`
 > header is legacy; use `.dev.vars` for anything the Worker needs locally.
-> `backend/.dev.vars` is git-ignored.
+> `src/backend/.dev.vars` is git-ignored.
 
 Open `http://localhost:4321`, register the **first** user (registration is
 closed afterwards), then in the dashboard:
@@ -72,13 +72,13 @@ closed afterwards), then in the dashboard:
 **Do not** add SMTP credentials or API keys as Worker secrets: they are
 per-user rows in D1, encrypted with `AES_256_KEY`.
 
-`backend/.dev.vars` currently still contains legacy `SMTP_USER`,
+`src/backend/.dev.vars` currently still contains legacy `SMTP_USER`,
 `SMTP_PASSWORD`, `SENDER_EMAIL` and `HOST` entries. They are ignored by the
 code; delete them to avoid confusion.
 
 ### 3.2 Config validation
 
-`createConfig` (`backend/src/config/config.ts`) validates:
+`createConfig` (`src/backend/src/config/config.ts`) validates:
 
 - `AES_256_KEY` is present and matches `^[0-9a-fA-F]{64}$`.
 - `makisend_db` is present.
@@ -89,7 +89,7 @@ Auth failures; a missing `PORT` can make nodemailer fall back to 465.
 
 ### 3.3 Frontend
 
-- `frontend/astro.config.mjs` reads `BACKEND_URL` (default
+- `src/frontend/astro.config.mjs` reads `BACKEND_URL` (default
   `http://localhost:8787`; Docker sets `http://backend:8787`).
 - Production needs no API base URL: the Worker serves UI and API on the same
   origin and `fetchApi` uses a relative path.
@@ -163,30 +163,30 @@ user exists.
 ## 5. Commands
 
 There is **no root `dev`/`test`/`lint` script**. Run backend commands from
-`backend/` or with a filter.
+`src/backend/` or with a filter.
 
 | Task | Command |
 |---|---|
 | Install everything | `pnpm install` (root) |
-| Worker dev server | `cd backend && pnpm dev` |
-| Frontend dev server | `pnpm --filter ./frontend dev` |
-| Build frontend | `pnpm --filter ./frontend build` |
-| Lint backend | `cd backend && pnpm lint` |
-| Auto-fix lint | `cd backend && pnpm lint:fix` |
-| Tests (watch) | `cd backend && pnpm test` |
-| Tests (once) | `cd backend && pnpm test:run` |
-| Tests UI | `cd backend && pnpm test:ui` |
-| Coverage | `cd backend && pnpm test:coverage` |
-| Regenerate Worker types | `cd backend && pnpm cf-typegen` |
-| Generate a migration | `cd backend && pnpm db:generate` |
-| Apply migrations (local) | `cd backend && pnpm exec wrangler d1 migrations apply makisend_db --local` |
-| Apply migrations (remote) | `cd backend && pnpm exec wrangler d1 migrations apply makisend_db --remote` |
-| Deploy | `cd backend && pnpm deploy` (build the frontend first) |
-| Tail production logs | `cd backend && pnpm exec wrangler tail` |
-| Legacy user bootstrap | `cd backend && pnpm user:create` |
+| Worker dev server | `cd src/backend && pnpm dev` |
+| Frontend dev server | `pnpm --filter ./src/frontend dev` |
+| Build frontend | `pnpm --filter ./src/frontend build` |
+| Lint backend | `cd src/backend && pnpm lint` |
+| Auto-fix lint | `cd src/backend && pnpm lint:fix` |
+| Tests (watch) | `cd src/backend && pnpm test` |
+| Tests (once) | `cd src/backend && pnpm test:run` |
+| Tests UI | `cd src/backend && pnpm test:ui` |
+| Coverage | `cd src/backend && pnpm test:coverage` |
+| Regenerate Worker types | `cd src/backend && pnpm cf-typegen` |
+| Generate a migration | `cd src/backend && pnpm db:generate` |
+| Apply migrations (local) | `cd src/backend && pnpm exec wrangler d1 migrations apply makisend_db --local` |
+| Apply migrations (remote) | `cd src/backend && pnpm exec wrangler d1 migrations apply makisend_db --remote` |
+| Deploy | `cd src/backend && pnpm deploy` (build the frontend first) |
+| Tail production logs | `cd src/backend && pnpm exec wrangler tail` |
+| Legacy user bootstrap | `cd src/backend && pnpm user:create` |
 
 > `pnpm --filter backend ...` does **not** match: the package is named
-> `makisend-poc`. Use `pnpm --filter ./backend ...`, `cd backend`, or
+> `makisend-poc`. Use `pnpm --filter ./src/backend ...`, `cd src/backend`, or
 > `pnpm --filter makisend-poc ...`.
 
 ### 5.1 Docker
@@ -201,7 +201,7 @@ pnpm docker:migrate
 ```
 
 Do not run the host dev server at the same time as the container (port 8787).
-Local D1 state persists in `backend/.wrangler`.
+Local D1 state persists in `src/backend/.wrangler`.
 
 ---
 
@@ -210,7 +210,7 @@ Local D1 state persists in `backend/.wrangler`.
 ### 6.1 Layout
 
 ```
-backend/test/
+src/backend/test/
 ├── setup.ts                     # clears mocks before each test
 ├── helpers/d1-setup.ts          # real Miniflare D1 + migrations
 ├── mocks/cloudflare-workers.ts  # WorkflowEntrypoint stub for Node
@@ -260,7 +260,7 @@ CI does not run `tsc`; run it manually before claiming typechecking is clean.
 ### 6.4 End-to-end attachment test
 
 ```bash
-cd backend && pnpm test:e2e:attachments
+cd src/backend && pnpm test:e2e:attachments
 ```
 
 Starts the Worker under `wrangler dev` (local D1, Queues and Workflows, nothing
@@ -270,27 +270,27 @@ workflow). The configuration targets Cloudflare Email Service; locally
 Miniflare writes every attachment the `send_email` binding receives to a file,
 which the test reads back and compares byte for byte. It also checks that a
 message without attachments carries none, and that both doors refuse the same
-invalid files. Report: `backend/test/e2e/reports/attachments.json`
+invalid files. Report: `src/backend/test/e2e/reports/attachments.json`
 (deterministic, to diff between runs).
-`backend/test/e2e/send-email-attachments.e2e.test.ts` covers the SMTP path with
+`src/backend/test/e2e/send-email-attachments.e2e.test.ts` covers the SMTP path with
 a real TLS server.
 
 ### 6.5 Adding a test file
 
-1. Put it under `backend/test/unit/<module>/`.
+1. Put it under `src/backend/test/unit/<module>/`.
 2. Import `{ describe, it, expect, vi }` from `vitest` (globals exist but the
    suite is explicit).
 3. Use `createTestD1`/`cleanupTestD1` only when you need real SQL behavior.
-4. Run `pnpm test:run` from `backend/`.
+4. Run `pnpm test:run` from `src/backend/`.
 
 ---
 
 ## 7. Database workflow
 
-Schema: `backend/src/db/schema.ts`. Migrations: `backend/drizzle/`.
+Schema: `src/backend/src/db/schema.ts`. Migrations: `src/backend/drizzle/`.
 
 ```bash
-cd backend
+cd src/backend
 # 1. Edit src/db/schema.ts
 pnpm db:generate                  # creates drizzle/000N_*.sql + meta snapshot
 pnpm exec wrangler d1 migrations apply makisend_db --local
@@ -338,7 +338,7 @@ Use `templates/` as the template:
    - construct the service in `initServices`;
    - mount the controller with a getter;
    - add `sessionMiddleware` (or `apiKeyMiddleware` for machine endpoints).
-8. Add the path to the Astro dev proxy in `frontend/astro.config.mjs` if the
+8. Add the path to the Astro dev proxy in `src/frontend/astro.config.mjs` if the
    frontend will call it.
 9. Add unit tests (service + HTTP) and, if it touches D1, a Miniflare test.
 
@@ -357,7 +357,7 @@ Use `templates/` as the template:
 3. Add deletion behavior deliberately (FK cascade vs application-level purge).
 4. If user-owned, add `userId` + an index on it.
 5. If encrypted, encrypt in the service and decrypt on read.
-6. Add the table to `backend/test/helpers/d1-setup.ts`? Nothing to do — it
+6. Add the table to `src/backend/test/helpers/d1-setup.ts`? Nothing to do — it
    loads all migrations.
 
 ### 8.4 Changing the send pipeline
@@ -409,8 +409,8 @@ const value = await step.do("my-step", async () => {
 The renderer is shared by the controller, the preview endpoint, and the
 frontend live preview. If you change the syntax:
 
-1. Update `VARIABLE_PATTERN` in `backend/src/templates/template-renderer.ts`.
-2. Update the duplicated regex/escaping in `frontend/src/components/templates-layout.tsx`.
+1. Update `VARIABLE_PATTERN` in `src/backend/src/templates/template-renderer.ts`.
+2. Update the duplicated regex/escaping in `src/frontend/src/components/templates-layout.tsx`.
 3. Update `template-renderer.test.ts`.
 4. Decide escaping per field: subject/text literal, HTML escaped.
 5. Keep the missing-variable check on `Object.prototype.hasOwnProperty`
@@ -426,12 +426,12 @@ frontend live preview. If you change the syntax:
 
 ### 8.7 Frontend page
 
-- Add an Astro page under `frontend/src/pages/dashboard/` that mounts a React
+- Add an Astro page under `src/frontend/src/pages/dashboard/` that mounts a React
   layout with `client:load`.
 - Wrap protected content in `SessionGuard` (client-side only; the API is the
   real gate).
 - Use `fetchApi` from `@/lib/api` so cookies are sent.
-- Add the API path to the dev proxy in `frontend/astro.config.mjs`.
+- Add the API path to the dev proxy in `src/frontend/astro.config.mjs`.
 - Follow existing shadcn/Base UI components; do not introduce a new UI library.
 - The template page is the exception: it imports `@react-email/editor` in a
   React island and persists the exported HTML/text plus the builder envelope.
@@ -449,9 +449,9 @@ frontend live preview. If you change the syntax:
 ### 9.1 Local
 
 - `wrangler dev` prints Pino JSON lines to the terminal.
-- D1 state: `backend/.wrangler/state/v3/d1`.
+- D1 state: `src/backend/.wrangler/state/v3/d1`.
 - Inspect the DB:
-  `cd backend && pnpm exec wrangler d1 execute makisend_db --local --command "select * from email_logs order by created_at desc limit 10"`
+  `cd src/backend && pnpm exec wrangler d1 execute makisend_db --local --command "select * from email_logs order by created_at desc limit 10"`
 - Queue/workflow are simulated; a workflow run appears in the dev logs with its
   step names.
 - If the frontend gets `401`, check the session cookie and `FRONTEND_URL`.
@@ -461,7 +461,7 @@ frontend live preview. If you change the syntax:
 ### 9.2 Production
 
 ```bash
-cd backend
+cd src/backend
 pnpm exec wrangler tail                      # live logs
 pnpm exec wrangler d1 execute makisend_db --remote --command "select ..."
 pnpm exec wrangler queues list
@@ -500,7 +500,7 @@ column explains why a send stopped.
 ### 9.4 Wiping local state
 
 ```bash
-cd backend
+cd src/backend
 rm -rf .wrangler
 pnpm exec wrangler d1 migrations apply makisend_db --local
 ```
@@ -514,8 +514,8 @@ Then register the first user again. Any local API keys/SMTP configs are gone.
 ### 10.1 Manual
 
 ```bash
-pnpm --filter ./frontend build      # required: Worker serves frontend/dist
-cd backend
+pnpm --filter ./src/frontend build      # required: Worker serves src/frontend/dist
+cd src/backend
 pnpm exec wrangler d1 migrations apply makisend_db --remote
 pnpm exec wrangler queues create makisend-send-email   # first time only
 pnpm deploy
@@ -524,7 +524,7 @@ pnpm deploy
 Secrets (once per environment):
 
 ```bash
-cd backend
+cd src/backend
 echo "<64 hex chars>" | pnpm exec wrangler secret put AES_256_KEY
 echo "<random>"       | pnpm exec wrangler secret put BETTER_AUTH_SECRET
 echo "https://<worker-url>" | pnpm exec wrangler secret put BETTER_AUTH_URL
@@ -550,10 +550,10 @@ share an origin. Preview uses the same secret names on the preview Worker.
 
 ### 10.3 Pre-deploy checklist
 
-- [ ] `cd backend && pnpm lint`
-- [ ] `cd backend && pnpm test:run`
-- [ ] `pnpm --filter ./frontend build`
-- [ ] Migration generated and committed (`backend/drizzle/*.sql` + meta)
+- [ ] `cd src/backend && pnpm lint`
+- [ ] `cd src/backend && pnpm test:run`
+- [ ] `pnpm --filter ./src/frontend build`
+- [ ] Migration generated and committed (`src/backend/drizzle/*.sql` + meta)
 - [ ] New bindings/secrets documented and created
 - [ ] Queue/workflow names unchanged or `wrangler.jsonc` updated consistently
 - [ ] No secrets or `.dev.vars` staged
@@ -646,7 +646,7 @@ From `AGENTS.md` and the codebase:
       it out.
 - [ ] Regenerate `worker-configuration.d.ts` (`pnpm cf-typegen`) and stop
       tracking stale generated types if possible.
-- [ ] Re-run `pnpm lint`, `pnpm test:run`, `pnpm --filter ./frontend build`.
+- [ ] Re-run `pnpm lint`, `pnpm test:run`, `pnpm --filter ./src/frontend build`.
 - [ ] Apply the security fixes in §12.2 before exposing to users.
 - [ ] Update `README.md`, `AGENTS.md` and these docs to match your fork.
 
@@ -656,7 +656,7 @@ From `AGENTS.md` and the codebase:
 
 When working in this repo, an automated agent should:
 
-1. **Read before writing** — `backend/src/index.ts`, the relevant module, and
+1. **Read before writing** — `src/backend/src/index.ts`, the relevant module, and
    the closest test.
 2. **Respect the architecture** — controller/service/repository/DTO; no
    repository in routes; no `c.env` in controllers.
@@ -664,9 +664,9 @@ When working in this repo, an automated agent should:
    returns, terminal history rows, instance id format, `FINAL_ATTEMPT` sync.
 4. **Validate with Zod** and keep `.strict()`.
 5. **Add or update tests** for every behavior change.
-6. **Run** `cd backend && pnpm lint && pnpm test:run` before finishing. Do not
+6. **Run** `cd src/backend && pnpm lint && pnpm test:run` before finishing. Do not
    claim `tsc` passes unless `pnpm exec tsc --noEmit` is clean.
-7. **Build the frontend** (`pnpm --filter ./frontend build`) if you touched it.
+7. **Build the frontend** (`pnpm --filter ./src/frontend build`) if you touched it.
 8. **Do not commit** unless explicitly asked; never commit `.dev.vars`,
    `.env`, `.wrangler`, secrets or generated artifacts.
 9. **Do not “fix” the D1 wipe, CORS or password exposure silently** — those are
@@ -681,30 +681,30 @@ When working in this repo, an automated agent should:
 
 | Need | File |
 |---|---|
-| Worker entrypoint / DI / middleware order | `backend/src/index.ts` |
-| Typed config | `backend/src/config/config.ts` |
-| Better Auth | `backend/src/lib/auth.ts` |
-| API-key middleware | `backend/src/middleware/api-key.middleware.ts` |
-| Send controller + DTO | `backend/src/send-email/send-email.controller.ts`, `send-email.dto.ts` |
-| Queue message contract | `backend/src/send-email/send-email.types.ts` |
-| SMTP transport | `backend/src/transports/smtp-email.transport.ts` |
-| Transport resolution | `backend/src/send-email/transport-resolver.ts` |
-| Error classifier | `backend/src/send-email/error-classifier.ts` |
-| Queue consumer | `backend/src/queue/send-email.consumer.ts` |
-| Workflow + retry decision | `backend/src/workflows/send-email.workflow.ts` |
-| Template renderer | `backend/src/templates/template-renderer.ts` |
-| Schema | `backend/src/db/schema.ts` |
-| Migrations | `backend/drizzle/` |
-| Crypto | `backend/src/core/crypto.ts` |
-| Sanitizer | `backend/src/core/html-sanitizer.ts` |
-| Logs/pagination | `backend/src/email-logs/email-logs.repository.ts` |
-| Dashboard SQL | `backend/src/dashboard/dashboard.repository.ts` |
-| Test D1 helper | `backend/test/helpers/d1-setup.ts` |
-| Workflow test stub | `backend/test/unit/workflows/send-email.workflow.test.ts` |
-| Worker config | `backend/wrangler.jsonc` |
+| Worker entrypoint / DI / middleware order | `src/backend/src/index.ts` |
+| Typed config | `src/backend/src/config/config.ts` |
+| Better Auth | `src/backend/src/lib/auth.ts` |
+| API-key middleware | `src/backend/src/middleware/api-key.middleware.ts` |
+| Send controller + DTO | `src/backend/src/send-email/send-email.controller.ts`, `send-email.dto.ts` |
+| Queue message contract | `src/backend/src/send-email/send-email.types.ts` |
+| SMTP transport | `src/backend/src/transports/smtp-email.transport.ts` |
+| Transport resolution | `src/backend/src/send-email/transport-resolver.ts` |
+| Error classifier | `src/backend/src/send-email/error-classifier.ts` |
+| Queue consumer | `src/backend/src/queue/send-email.consumer.ts` |
+| Workflow + retry decision | `src/backend/src/workflows/send-email.workflow.ts` |
+| Template renderer | `src/backend/src/templates/template-renderer.ts` |
+| Schema | `src/backend/src/db/schema.ts` |
+| Migrations | `src/backend/drizzle/` |
+| Crypto | `src/backend/src/core/crypto.ts` |
+| Sanitizer | `src/backend/src/core/html-sanitizer.ts` |
+| Logs/pagination | `src/backend/src/email-logs/email-logs.repository.ts` |
+| Dashboard SQL | `src/backend/src/dashboard/dashboard.repository.ts` |
+| Test D1 helper | `src/backend/test/helpers/d1-setup.ts` |
+| Workflow test stub | `src/backend/test/unit/workflows/send-email.workflow.test.ts` |
+| Worker config | `src/backend/wrangler.jsonc` |
 | CI/CD | `.github/workflows/ci.yml`, `deploy.yml` |
-| Frontend API helper | `frontend/src/lib/api.ts` |
-| Frontend dev proxy | `frontend/astro.config.mjs` |
+| Frontend API helper | `src/frontend/src/lib/api.ts` |
+| Frontend dev proxy | `src/frontend/astro.config.mjs` |
 | Existing docs | `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md` |
 
 ---

@@ -1,6 +1,6 @@
 /**
  * Two Wrangler configurations describe the same Worker:
- * - backend/wrangler.jsonc: our own deployments (GitHub Actions, production + preview);
+ * - src/backend/wrangler.jsonc: our own deployments (GitHub Actions, production + preview);
  * - wrangler.jsonc at the root: the "Deploy to Cloudflare" button and Workers Builds in copies.
  *
  * ── Failure analysis ──
@@ -20,7 +20,7 @@ import { withPublicUrls, type Bindings } from "@/index";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const backendDir = join(here, "../../..");
-const rootDir = join(backendDir, "..");
+const rootDir = join(backendDir, "../..");
 
 /** Strips `//` line comments (no `//` appears inside the strings of these files). */
 function readJsonc(path: string): Record<string, unknown> {
@@ -51,7 +51,7 @@ describe("W2 root wrangler.jsonc paths", () => {
   it("points at the backend entry point, the migrations and the dashboard build", () => {
     expect(existsSync(join(rootDir, root.main as string))).toBe(true);
     expect(existsSync(join(rootDir, (root.d1_databases as D1[])[0].migrations_dir))).toBe(true);
-    expect((root.assets as { directory: string }).directory).toBe("./frontend/dist");
+    expect((root.assets as { directory: string }).directory).toBe("./src/frontend/dist");
   });
 
   it("the root deploy script is what Workers Builds runs, and only there", () => {

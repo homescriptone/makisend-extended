@@ -3,7 +3,7 @@ name: Release
 # Publishes a GitHub release when the version in the root package.json has none yet.
 # Installed instances read the latest release (GET /repos/.../releases/latest) to show the
 # "new version available" banner, so bumping `version` (and APP_VERSION in
-# backend/src/core/version.ts, kept equal by the tests) is how a release is cut.
+# src/backend/src/core/version.ts, kept equal by the tests) is how a release is cut.
 on:
   push:
     branches: [main]
@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION=$(jq -r .version package.json)
-          APP_VERSION=$(sed -nE 's/^export const APP_VERSION = "([^"]+)";$/\1/p' backend/src/core/version.ts)
+          APP_VERSION=$(sed -nE 's/^export const APP_VERSION = "([^"]+)";$/\1/p' src/backend/src/core/version.ts)
           if [ "$VERSION" != "$APP_VERSION" ]; then
             echo "::error::package.json version ($VERSION) differs from APP_VERSION ($APP_VERSION)"
             exit 1

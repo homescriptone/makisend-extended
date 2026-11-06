@@ -62,7 +62,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm test:e2e:docker
-        working-directory: backend
+        working-directory: src/backend
 
   publish:
     name: Build and push the image

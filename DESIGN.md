@@ -194,7 +194,7 @@ MakiSend is a tool people run for themselves: a dashboard they open to check tha
 
 This file is the single source of truth for both surfaces:
 
-- the **dashboard** (`frontend/` in this repository, shadcn/ui on Tailwind 4) maps these tokens onto its shadcn variables in `frontend/src/styles/global.css`;
+- the **dashboard** (`src/frontend/` in this repository, shadcn/ui on Tailwind 4) maps these tokens onto its shadcn variables in `src/frontend/src/styles/global.css`;
 - the **website** (`lixalistudio-oss/makisend-website`, Arc components) loads Arc's `foundation.css` and overrides its accent with these values.
 
 Change a token here first, then in both places. Arc's own rules (`https://uiarc.dev/r/skills/arc/SKILL.md`) apply everywhere this file is silent.

@@ -41,11 +41,11 @@ jobs:
 
       - name: Lint backend
         run: pnpm lint
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Test backend
         run: pnpm test:run
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Build frontend
         run: pnpm --filter frontend build
@@ -54,7 +54,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/
+          path: src/frontend/dist/
           retention-days: 7
 
   deploy:
@@ -110,7 +110,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/
+          path: src/frontend/dist/
 
       # --- Backend (Workers) ---
 
@@ -124,7 +124,7 @@ jobs:
             echo "::error::Destructive D1 operation found in the production deploy job"
             exit 1
           fi
-          if ! grep -q '"database_name": "makisend-db"' backend/wrangler.jsonc; then
+          if ! grep -q '"database_name": "makisend-db"' src/backend/wrangler.jsonc; then
             echo "::error::Production D1 binding (makisend-db) not found in wrangler.jsonc — aborting"
             exit 1
           fi
@@ -147,18 +147,18 @@ jobs:
           fi
           echo "db_id=$DB_ID" >> "$GITHUB_OUTPUT"
           echo "Production D1: $DB_ID (existing, untouched)"
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Apply D1 migrations (production)
         run: npx wrangler@4.131.1 d1 migrations apply makisend_db --remote
-        working-directory: backend
+        working-directory: src/backend
 
       # The producer binding must point at an existing queue. `queues create`
       # fails when the queue already exists, hence `|| true`. The DLQ is
       # auto-created by Cloudflare when the consumer references it.
       - name: Ensure send-email queue exists (production)
         run: npx wrangler@4.131.1 queues create makisend-send-email || true
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Deploy Worker (production)
         id: deploy-worker
@@ -167,7 +167,7 @@ jobs:
           echo "$OUTPUT"
           WORKER_URL=$(echo "$OUTPUT" | grep -oP 'https://\S+\.workers\.dev' | head -1)
           echo "url=$WORKER_URL" >> "$GITHUB_OUTPUT"
-        working-directory: backend
+        working-directory: src/backend
 
       # Secrets are provisioned once by hand and survive every deploy. This only
       # reports which ones are still missing so the app doesn't fail silently.
@@ -190,11 +190,11 @@ jobs:
           done
           if [ -n "$MISSING" ]; then
             echo "::warning::Missing on production Worker:$MISSING"
-            echo "Set them once with: cd backend && echo \"<value>\" | npx wrangler@4.131.1 secret put <NAME>"
+            echo "Set them once with: cd src/backend && echo \"<value>\" | npx wrangler@4.131.1 secret put <NAME>"
           else
             echo "All required production secrets are present."
           fi
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Summary
         run: |
@@ -306,7 +306,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/
+          path: src/frontend/dist/
 
       # --- Backend preview (Workers) ---
 
@@ -376,28 +376,28 @@ jobs:
 
           echo "db_id=$DB_ID" >> "$GITHUB_OUTPUT"
           echo "Created preview D1: $DB_ID"
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Configure preview database ID
         run: |
           sed -i "s/PREVIEW_DB_ID_PLACEHOLDER/${{ steps.create-db.outputs.db_id }}/" wrangler.jsonc
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Apply D1 migrations (preview)
         run: npx wrangler@4.131.1 d1 migrations apply makisend_db --remote --env preview
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Set preview Worker secrets
         run: |
           echo "${{ secrets.AES_256_KEY }}" | npx wrangler@4.131.1 secret put AES_256_KEY --env preview
           echo "${{ secrets.BETTER_AUTH_SECRET }}" | npx wrangler@4.131.1 secret put BETTER_AUTH_SECRET --env preview
-        working-directory: backend
+        working-directory: src/backend
 
       # Preview uses its own queue so preview traffic can never be consumed by
       # the production worker (which would deliver real emails).
       - name: Ensure send-email queue exists (preview)
         run: npx wrangler@4.131.1 queues create makisend-send-email-preview || true
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Deploy Worker (preview)
         id: deploy-worker
@@ -406,13 +406,13 @@ jobs:
           echo "$OUTPUT"
           WORKER_URL=$(echo "$OUTPUT" | grep -oP 'https://\S+\.workers\.dev' | head -1)
           echo "url=$WORKER_URL" >> "$GITHUB_OUTPUT"
-        working-directory: backend
+        working-directory: src/backend
 
       - name: Set preview Worker secrets (same-origin URLs)
         run: |
           echo "${{ steps.deploy-worker.outputs.url }}" | npx wrangler@4.131.1 secret put BETTER_AUTH_URL --env preview
           echo "${{ steps.deploy-worker.outputs.url }}" | npx wrangler@4.131.1 secret put FRONTEND_URL --env preview
-        working-directory: backend
+        working-directory: src/backend
 
       # --- Comment preview URL on PR ---
       # Always runs (even when an earlier step failed) so the PR never ends up

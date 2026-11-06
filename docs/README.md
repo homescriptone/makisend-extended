@@ -22,7 +22,7 @@ Related docs:
 
 ## Checks
 
-Run from `backend/`:
+Run from `src/backend/`:
 
 - Tests: `pnpm test:run`
 - Lint: `pnpm lint`
